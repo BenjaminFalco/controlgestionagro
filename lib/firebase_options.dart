@@ -64,6 +64,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '714352450375',
     projectId: 'gestion-y-control-agro',
     storageBucket: 'gestion-y-control-agro.firebasestorage.app',
+    iosClientId: '714352450375-r68l4hrd58nfbovt88nc6s4ioc49nu2e.apps.googleusercontent.com',
     iosBundleId: 'com.example.controlgestionagro',
   );
 
@@ -73,6 +74,7 @@ class DefaultFirebaseOptions {
     messagingSenderId: '714352450375',
     projectId: 'gestion-y-control-agro',
     storageBucket: 'gestion-y-control-agro.firebasestorage.app',
+    iosClientId: '714352450375-r68l4hrd58nfbovt88nc6s4ioc49nu2e.apps.googleusercontent.com',
     iosBundleId: 'com.example.controlgestionagro',
   );
 
@@ -85,4 +87,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'gestion-y-control-agro.firebasestorage.app',
     measurementId: 'G-THPPNFCRH5',
   );
+
 }

@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,14 +16,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> registerUser() async {
     try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      // 🔹 Crear usuario en Firebase Authentication
+      UserCredential userCredential = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
-      // 🔥 Redirigir al usuario al Login después del registro
+      // 🔹 Obtener UID del usuario
+      String uid = userCredential.user!.uid;
+
+      // 🔹 Guardar usuario en Firestore
+      await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
+        "email": emailController.text.trim(),
+        "fecha_creacion":
+            FieldValue.serverTimestamp(), // Guarda la fecha de creación
+      });
+
+      print("✅ Usuario registrado y guardado en Firestore correctamente.");
+
+      // 🔹 Regresar a la pantalla de Login
       Navigator.pop(context);
     } catch (e) {
+      print("❌ Error en registro: $e");
       setState(() {
         errorMessage = 'Error en registro: ${e.toString()}';
       });

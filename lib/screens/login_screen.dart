@@ -1,6 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'register_screen.dart'; // Importar la pantalla de registro
+import 'package:flutter/material.dart';
+import 'register_screen.dart';
+import 'setup_screen.dart';
+import 'admin/admin_dashboard.dart';
+import 'worker/worker_dashboard.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -16,10 +20,51 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> loginUser() async {
     try {
-      await FirebaseAuth.instance.signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+      // 🔹 Iniciar sesión en Firebase Authentication
+      UserCredential userCredential = await FirebaseAuth.instance
+          .signInWithEmailAndPassword(
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
+
+      String uid = userCredential.user!.uid;
+
+      // 🔹 Obtener datos del usuario desde Firestore
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(uid)
+              .get();
+
+      if (!userDoc.exists || userDoc.data() == null) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SetupScreen()),
+        );
+        return;
+      }
+
+      Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
+
+      if (!userData.containsKey('nombre') || !userData.containsKey('rol')) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (context) => const SetupScreen()),
+        );
+      } else {
+        String rol = userData['rol'];
+        if (rol == "admin") {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const AdminDashboard()),
+          );
+        } else {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const WorkerDashboard()),
+          );
+        }
+      }
     } catch (e) {
       setState(() {
         errorMessage = 'Error en login: ${e.toString()}';
@@ -58,7 +103,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 // 🔥 Navegar a la pantalla de Registro
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (context) => const RegisterScreen()),
+                  MaterialPageRoute(
+                    builder: (context) => const RegisterScreen(),
+                  ),
                 );
               },
               child: const Text("¿No tienes cuenta? Regístrate aquí"),

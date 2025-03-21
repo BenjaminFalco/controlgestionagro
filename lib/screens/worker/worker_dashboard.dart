@@ -1,15 +1,15 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'setup_screen.dart';
+import '../setup_screen.dart';
 
-class MenuScreen extends StatelessWidget {
-  const MenuScreen({super.key});
+class WorkerDashboard extends StatelessWidget {
+  const WorkerDashboard({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Menú Principal"),
+        title: const Text("Panel de Trabajador"),
         actions: [
           IconButton(
             icon: const Icon(Icons.settings),
@@ -30,7 +30,13 @@ class MenuScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: const Center(child: Text("¡Bienvenido! Has iniciado sesión.")),
+      body: const Center(
+        child: Text(
+          "Bienvenido, Trabajador.\nAquí podrás ingresar datos de las parcelas.",
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+      ),
     );
   }
 }
