@@ -12,74 +12,53 @@ class VerMatriz extends StatefulWidget {
 }
 
 class _VerMatrizState extends State<VerMatriz> {
-  Map<String, List<int>> bloques = {'A': [], 'B': [], 'C': [], 'D': []};
-
-  bool cargando = true;
+  String? bloqueSeleccionado;
+  String nombreSerie = '';
+  List<DocumentSnapshot> parcelas = [];
+  bool cargando = false;
 
   @override
   void initState() {
     super.initState();
-    cargarParcelas();
+    cargarNombreSerie();
   }
 
-  Future<void> cargarParcelas() async {
-    final serieRef = FirebaseFirestore.instance
-        .collection('ciudades')
-        .doc(widget.ciudadId)
-        .collection('series')
-        .doc(widget.serieId);
-
-    for (var bloque in ['A', 'B', 'C', 'D']) {
-      final snapshot =
-          await serieRef
-              .collection('bloques')
-              .doc(bloque)
-              .collection('parcelas')
-              .orderBy('numero')
-              .get();
-
-      setState(() {
-        bloques[bloque] = snapshot.docs.map((d) => d['numero'] as int).toList();
-      });
-    }
+  Future<void> cargarNombreSerie() async {
+    final serieDoc =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .get();
 
     setState(() {
-      cargando = false;
+      nombreSerie = serieDoc['nombre'];
     });
   }
 
-  Widget buildBloque(String bloqueId, List<int> parcelas) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          "Bloque $bloqueId",
-          style: const TextStyle(fontWeight: FontWeight.bold),
-        ),
-        const SizedBox(height: 4),
-        SizedBox(
-          height: 40,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: parcelas.length,
-            itemBuilder: (context, index) {
-              return Container(
-                width: 40,
-                margin: const EdgeInsets.symmetric(horizontal: 2),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: Colors.deepPurple[100],
-                  border: Border.all(color: Colors.deepPurple),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: Text(parcelas[index].toString()),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 12),
-      ],
-    );
+  Future<void> cargarParcelas(String bloque) async {
+    setState(() {
+      cargando = true;
+      parcelas = [];
+    });
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .collection('bloques')
+            .doc(bloque)
+            .collection('parcelas')
+            .orderBy('numero')
+            .get();
+
+    setState(() {
+      parcelas = snapshot.docs;
+      cargando = false;
+    });
   }
 
   @override
@@ -88,15 +67,89 @@ class _VerMatrizState extends State<VerMatriz> {
       appBar: AppBar(title: const Text("Visualización de Matriz")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child:
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              "Serie: $nombreSerie",
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: bloqueSeleccionado,
+              decoration: const InputDecoration(
+                labelText: "Seleccionar bloque",
+              ),
+              items:
+                  ['A', 'B', 'C', 'D'].map((b) {
+                    return DropdownMenuItem(value: b, child: Text("Bloque $b"));
+                  }).toList(),
+              onChanged: (value) {
+                setState(() => bloqueSeleccionado = value);
+                if (value != null) {
+                  cargarParcelas(value);
+                }
+              },
+            ),
+            const SizedBox(height: 20),
             cargando
                 ? const Center(child: CircularProgressIndicator())
-                : ListView(
-                  children:
-                      bloques.entries.map((entry) {
-                        return buildBloque(entry.key, entry.value);
-                      }).toList(),
+                : parcelas.isEmpty
+                ? const Text("⚠️ Este bloque aún no tiene parcelas creadas.")
+                : Expanded(
+                  child: GridView.builder(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 5,
+                          mainAxisSpacing: 10,
+                          crossAxisSpacing: 10,
+                          childAspectRatio: 1.5,
+                        ),
+                    itemCount: parcelas.length,
+                    itemBuilder: (context, index) {
+                      final parcela = parcelas[index];
+                      final numero = parcela['numero'];
+                      return Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.deepPurple[50],
+                          border: Border.all(color: Colors.deepPurple),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              "Parcela $numero",
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            ElevatedButton(
+                              onPressed: () {
+                                // 🔜 Configurar acción de edición más adelante
+                              },
+                              style: ElevatedButton.styleFrom(
+                                minimumSize: const Size(80, 30),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                              ),
+                              child: const Text(
+                                "Editar",
+                                style: TextStyle(fontSize: 12),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
                 ),
+          ],
+        ),
       ),
     );
   }
