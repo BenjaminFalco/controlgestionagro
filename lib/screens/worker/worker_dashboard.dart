@@ -1,9 +1,28 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../setup_screen.dart';
+import 'inicio_tratamiento.dart'; // 💡 Asegúrate de que esta ruta esté correcta
 
-class WorkerDashboard extends StatelessWidget {
+class WorkerDashboard extends StatefulWidget {
   const WorkerDashboard({super.key});
+
+  @override
+  State<WorkerDashboard> createState() => _WorkerDashboardState();
+}
+
+class _WorkerDashboardState extends State<WorkerDashboard> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Redirige automáticamente después de un frame
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const InicioTratamientoScreen()),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,7 +33,6 @@ class WorkerDashboard extends StatelessWidget {
           IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () {
-              // 🔥 Ir a la pantalla de configuración para editar datos
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (context) => const SetupScreen()),
@@ -31,11 +49,7 @@ class WorkerDashboard extends StatelessWidget {
         ],
       ),
       body: const Center(
-        child: Text(
-          "Bienvenido, Trabajador.\nAquí podrás ingresar datos de las parcelas.",
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
+        child: CircularProgressIndicator(), // Carga hasta redirigir
       ),
     );
   }

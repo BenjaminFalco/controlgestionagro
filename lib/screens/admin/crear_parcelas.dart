@@ -54,15 +54,17 @@ class _CrearParcelasState extends State<CrearParcelas> {
       return;
     }
 
-    int? numeroInicial;
+    final serieRef = FirebaseFirestore.instance
+        .collection('ciudades')
+        .doc(ciudadSeleccionada!)
+        .collection('series')
+        .doc(serieSeleccionada!);
 
-    // Obtener la primera parcela del bloque A
+    final serieDoc = await serieRef.get();
+    final int cantidadBloques = serieDoc['matriz_alto'];
+
     final docPrimera =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(ciudadSeleccionada!)
-            .collection('series')
-            .doc(serieSeleccionada!)
+        await serieRef
             .collection('bloques')
             .doc('A')
             .collection('parcelas')
@@ -78,16 +80,12 @@ class _CrearParcelasState extends State<CrearParcelas> {
       return;
     }
 
-    numeroInicial = docPrimera.data()?['numero_ficha'] as int;
-    int contador = numeroInicial;
+    int contador = docPrimera['numero_ficha'];
 
-    for (var bloque in ['A', 'B', 'C', 'D']) {
+    for (int i = 0; i < cantidadBloques; i++) {
+      String bloque = String.fromCharCode(65 + i);
       final snap =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada!)
-              .collection('series')
-              .doc(serieSeleccionada!)
+          await serieRef
               .collection('bloques')
               .doc(bloque)
               .collection('parcelas')
@@ -100,9 +98,9 @@ class _CrearParcelasState extends State<CrearParcelas> {
       }
     }
 
-    await cargarMatrizCompleta(); // Refrescar vista
+    await cargarMatrizCompleta();
     setState(() {
-      mensaje = "✅ Fichas autocompletadas desde $numeroInicial.";
+      mensaje = "✅ Fichas autocompletadas desde ${docPrimera['numero_ficha']}.";
     });
   }
 
@@ -115,7 +113,11 @@ class _CrearParcelasState extends State<CrearParcelas> {
         .collection('series')
         .doc(serieSeleccionada!);
 
-    for (var bloque in ['A', 'B', 'C', 'D']) {
+    final serieDoc = await serieRef.get();
+    final int cantidadBloques = serieDoc['matriz_alto'];
+
+    for (int i = 0; i < cantidadBloques; i++) {
+      String bloque = String.fromCharCode(65 + i);
       final bloqueRef = serieRef.collection('bloques').doc(bloque);
       final snapshot = await bloqueRef.collection('parcelas').get();
 
@@ -124,8 +126,10 @@ class _CrearParcelasState extends State<CrearParcelas> {
       }
     }
 
-    await cargarMatrizCompleta(); // Actualiza vista
-    setState(() => mensaje = "✅ Parcela y bloques reiniciados.");
+    await cargarMatrizCompleta();
+    setState(
+      () => mensaje = "✅ Serie reiniciada: todas las parcelas eliminadas.",
+    );
   }
 
   Future<void> cargarMatrizCompleta() async {
@@ -133,6 +137,7 @@ class _CrearParcelasState extends State<CrearParcelas> {
 
     setState(() {
       cargandoParcelas = true;
+      parcelasPorBloque.clear();
     });
 
     final serieRef = FirebaseFirestore.instance
@@ -141,7 +146,11 @@ class _CrearParcelasState extends State<CrearParcelas> {
         .collection('series')
         .doc(serieSeleccionada!);
 
-    for (var bloque in ['A', 'B', 'C', 'D']) {
+    final serieDoc = await serieRef.get();
+    final int cantidadBloques = serieDoc['matriz_alto'];
+
+    for (int i = 0; i < cantidadBloques; i++) {
+      String bloque = String.fromCharCode(65 + i); // A, B, C...
       final snap =
           await serieRef
               .collection('bloques')
@@ -155,23 +164,19 @@ class _CrearParcelasState extends State<CrearParcelas> {
       }
     }
 
-    setState(() {
-      cargandoParcelas = false;
-    });
+    setState(() => cargandoParcelas = false);
   }
 
   Future<void> crearBloquesYParcelas() async {
     if (ciudadSeleccionada == null || serieSeleccionada == null) {
-      setState(() {
-        mensaje = "⚠️ Selecciona ciudad y serie.";
-      });
+      setState(() => mensaje = "⚠️ Selecciona ciudad y serie.");
       return;
     }
+
     if (parcelasPorBloque.isNotEmpty) {
-      setState(() {
-        mensaje =
-            "⚠️ Ya existen parcelas en esta serie. No puedes volver a crear.";
-      });
+      setState(
+        () => mensaje = "⚠️ Ya existen parcelas. No puedes volver a crear.",
+      );
       return;
     }
 
@@ -179,49 +184,45 @@ class _CrearParcelasState extends State<CrearParcelas> {
       final serieDoc =
           await FirebaseFirestore.instance
               .collection('ciudades')
-              .doc(ciudadSeleccionada)
+              .doc(ciudadSeleccionada!)
               .collection('series')
-              .doc(serieSeleccionada)
+              .doc(serieSeleccionada!)
               .get();
 
       final int cantidadParcelas = serieDoc['matriz_largo'];
+      final int cantidadBloques = serieDoc['matriz_alto'];
       final serieRef = FirebaseFirestore.instance
           .collection('ciudades')
-          .doc(ciudadSeleccionada)
+          .doc(ciudadSeleccionada!)
           .collection('series')
-          .doc(serieSeleccionada);
+          .doc(serieSeleccionada!);
 
-      for (var bloque in ['A', 'B', 'C', 'D']) {
+      for (int i = 0; i < cantidadBloques; i++) {
+        String bloque = String.fromCharCode(65 + i);
         final bloqueRef = serieRef.collection('bloques').doc(bloque);
         await bloqueRef.set({"nombre": bloque}, SetOptions(merge: true));
 
-        int creadas = 0;
-        for (int i = 1; i <= cantidadParcelas; i++) {
-          final parcelaRef = bloqueRef.collection('parcelas').doc(i.toString());
+        for (int j = 1; j <= cantidadParcelas; j++) {
+          final parcelaRef = bloqueRef.collection('parcelas').doc(j.toString());
           final parcelaSnap = await parcelaRef.get();
 
           if (!parcelaSnap.exists) {
             await parcelaRef.set({
-              "numero": i,
+              "numero": j,
               "tratamiento": true,
               "trabajador_id": null,
               "total_raices": null,
               "evaluacion": null,
               "frecuencia_relativa": null,
             });
-            creadas++;
           }
         }
-        debugPrint("Bloque $bloque → Parcelas nuevas creadas: $creadas");
       }
 
-      setState(() {
-        mensaje = "✅ Parcelas generadas solo si no existían ya.";
-      });
+      setState(() => mensaje = "✅ Parcelas generadas correctamente.");
+      await cargarMatrizCompleta();
     } catch (e) {
-      setState(() {
-        mensaje = "❌ Error al crear parcelas: ${e.toString()}";
-      });
+      setState(() => mensaje = "❌ Error al crear parcelas: ${e.toString()}");
     }
   }
 

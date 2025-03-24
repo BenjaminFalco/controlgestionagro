@@ -1,11 +1,10 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:controlgestionagro/screens/setup_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
-import 'screens/admin/admin_dashboard.dart';
-import 'screens/worker/worker_dashboard.dart';
-import 'screens/setup_screen.dart';
+import 'screens/loading_screen.dart';
+import 'screens/login_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -19,15 +18,16 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Gestión Agro',
+      title: 'Flutter Firebase',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.green),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
       ),
       home: const AuthWrapper(),
     );
   }
 }
 
+// 🔥 Verifica si el usuario está autenticado
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -37,44 +37,11 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Scaffold(
-            body: Center(child: CircularProgressIndicator()),
-          );
+          return const LoadingScreen(); // Pantalla de carga
         } else if (snapshot.hasData) {
-          return FutureBuilder<DocumentSnapshot>(
-            future:
-                FirebaseFirestore.instance
-                    .collection('usuarios')
-                    .doc(snapshot.data!.uid)
-                    .get(),
-            builder: (context, userSnapshot) {
-              if (userSnapshot.connectionState == ConnectionState.waiting) {
-                return const Scaffold(
-                  body: Center(child: CircularProgressIndicator()),
-                );
-              }
-
-              if (!userSnapshot.hasData ||
-                  !userSnapshot.data!.exists ||
-                  userSnapshot.data!.get('nombre') == null ||
-                  userSnapshot.data!.get('rol') == null) {
-                // 🔥 Si el usuario no tiene datos completos, mostrar formulario de configuración
-                return const SetupScreen();
-              } else {
-                // 🔥 Redirigir según el rol del usuario
-                String rol = userSnapshot.data!.get('rol');
-                if (rol == "admin") {
-                  return const AdminDashboard();
-                } else {
-                  return const WorkerDashboard();
-                }
-              }
-            },
-          );
+          return const SetupScreen(); // Usuario autenticado -> Menú principal
         } else {
-          return const Scaffold(
-            body: Center(child: Text("Error de autenticación")),
-          );
+          return const LoginScreen(); // Usuario no autenticado -> Login
         }
       },
     );

@@ -12,6 +12,9 @@ class _CrearSerieState extends State<CrearSerie> {
   final TextEditingController nombreSerieController = TextEditingController();
   final TextEditingController cantidadParcelasController =
       TextEditingController();
+  final TextEditingController cantidadBloquesController =
+      TextEditingController();
+
   String mensaje = '';
   String? ciudadSeleccionada;
   List<QueryDocumentSnapshot> ciudades = [];
@@ -35,9 +38,11 @@ class _CrearSerieState extends State<CrearSerie> {
     final cantidadParcelas = int.tryParse(
       cantidadParcelasController.text.trim(),
     );
+    final cantidadBloques = int.tryParse(cantidadBloquesController.text.trim());
 
     if (nombreSerie.isEmpty ||
         cantidadParcelas == null ||
+        cantidadBloques == null ||
         ciudadSeleccionada == null) {
       setState(() {
         mensaje = '⚠️ Completa todos los campos.';
@@ -50,23 +55,21 @@ class _CrearSerieState extends State<CrearSerie> {
           .collection('ciudades')
           .doc(ciudadSeleccionada);
 
-      // 🔹 Crear serie dentro de la ciudad
       final serieRef = await ciudadRef.collection('series').add({
         "nombre": nombreSerie,
         "matriz_largo": cantidadParcelas,
-        "matriz_alto": 4,
+        "matriz_alto": cantidadBloques,
         "fecha_creacion": FieldValue.serverTimestamp(),
       });
 
-      // 🔹 Crear bloques A–D
-      for (var bloque in ['A', 'B', 'C', 'D']) {
+      for (int i = 0; i < cantidadBloques; i++) {
+        String bloque = String.fromCharCode(65 + i); // A, B, C, D...
         final bloqueRef = serieRef.collection('bloques').doc(bloque);
         await bloqueRef.set({"nombre": bloque});
 
-        // 🔹 Crear parcelas dentro del bloque
-        for (int i = 1; i <= cantidadParcelas; i++) {
+        for (int j = 1; j <= cantidadParcelas; j++) {
           await bloqueRef.collection('parcelas').add({
-            "numero": i,
+            "numero": j,
             "tratamiento": true,
             "trabajador_id": null,
             "total_raices": null,
@@ -78,9 +81,10 @@ class _CrearSerieState extends State<CrearSerie> {
 
       setState(() {
         mensaje =
-            "✅ Serie '$nombreSerie' creada con $cantidadParcelas parcelas por bloque.";
+            "✅ Serie '$nombreSerie' creada con $cantidadBloques bloques y $cantidadParcelas parcelas por bloque.";
         nombreSerieController.clear();
         cantidadParcelasController.clear();
+        cantidadBloquesController.clear();
       });
     } catch (e) {
       setState(() {
@@ -120,12 +124,21 @@ class _CrearSerieState extends State<CrearSerie> {
             ),
             const SizedBox(height: 10),
             TextField(
+              controller: cantidadBloquesController,
+              decoration: const InputDecoration(
+                labelText: "Cantidad de bloques en la serie",
+              ),
+              keyboardType: TextInputType.number,
+            ),
+            const SizedBox(height: 10),
+            TextField(
               controller: cantidadParcelasController,
               decoration: const InputDecoration(
                 labelText: "Cantidad de parcelas por bloque",
               ),
               keyboardType: TextInputType.number,
             ),
+
             const SizedBox(height: 20),
             ElevatedButton(
               onPressed: crearSerie,

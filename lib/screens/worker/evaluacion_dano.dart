@@ -3,8 +3,13 @@ import 'package:flutter/material.dart';
 
 class EvaluacionDanoScreen extends StatefulWidget {
   final DocumentReference parcelaRef;
+  final int totalRaices; // 🔹 NUEVO
 
-  const EvaluacionDanoScreen({super.key, required this.parcelaRef});
+  const EvaluacionDanoScreen({
+    super.key,
+    required this.parcelaRef,
+    required this.totalRaices, // 🔹 NUEVO
+  });
 
   @override
   State<EvaluacionDanoScreen> createState() => _EvaluacionDanoScreenState();
@@ -18,8 +23,16 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   double frecuenciaRelativa = 0.0;
 
   void agregarCampo() {
+    if (evaluacionesControllers.length >= widget.totalRaices) {
+      setState(() {
+        mensaje = "⚠️ Ya ingresaste todos los valores de daño posibles.";
+      });
+      return;
+    }
+
     setState(() {
       evaluacionesControllers.add(TextEditingController());
+      mensaje = '';
     });
   }
 
@@ -78,13 +91,19 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    int evaluacionesIngresadas = evaluacionesControllers.length;
+    int evaluacionesRestantes = widget.totalRaices - evaluacionesIngresadas;
+
     return Scaffold(
       appBar: AppBar(title: const Text("Evaluación de daño")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            const Text("Ingresa valores de evaluación de daño (0–7)"),
+            Text(
+              "🔢 Daño evaluado: $evaluacionesIngresadas / ${widget.totalRaices}",
+            ),
+            Text("⏳ Faltan: $evaluacionesRestantes raíces por evaluar"),
             const SizedBox(height: 10),
             ...evaluacionesControllers.asMap().entries.map((entry) {
               int index = entry.key;
@@ -94,7 +113,9 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 padding: const EdgeInsets.symmetric(vertical: 4.0),
                 child: TextField(
                   controller: controller,
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
+                  keyboardType: const TextInputType.numberWithOptions(
+                    decimal: true,
+                  ),
                   decoration: InputDecoration(
                     labelText: "Valor ${index + 1}",
                     border: const OutlineInputBorder(),

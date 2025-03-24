@@ -38,6 +38,14 @@ dependencies:
   firebase_auth: ^5.5.1
   cloud_firestore: ^5.6.5
   fl_chart: ^0.64.0
+  google_sign_in: ^6.1.5
+  shared_preferences: ^2.2.2
+  connectivity_plus: ^5.0.2
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  path_provider: ^2.0.15
+  intl: ^0.18.1
+  uuid: ^4.0.0
 
 dev_dependencies:
   flutter_test:

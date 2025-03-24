@@ -1,23 +1,33 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'formulario_tratamiento.dart'; // Vista donde se ingresan datos por parcela
+import 'formulario_tratamiento.dart';
+import '../login_screen.dart';
 
-class InicioTratamiento extends StatefulWidget {
-  const InicioTratamiento({super.key});
+class InicioTratamientoScreen extends StatefulWidget {
+  const InicioTratamientoScreen({super.key});
 
   @override
-  State<InicioTratamiento> createState() => _InicioTratamientoState();
+  State<InicioTratamientoScreen> createState() =>
+      _InicioTratamientoScreenState();
 }
 
-class _InicioTratamientoState extends State<InicioTratamiento> {
+class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   String? ciudadSeleccionada;
   String? serieSeleccionada;
   String? bloqueSeleccionado;
-  int? parcelaInicial;
+  String? parcelaSeleccionada;
 
   List<QueryDocumentSnapshot> ciudades = [];
   List<QueryDocumentSnapshot> series = [];
-  List<int> parcelas = [];
+  List<String> bloques = [];
+  List<DocumentSnapshot> parcelas = [];
+
+  String numeroFicha = '';
+  String numeroTratamiento = '';
+  final TextEditingController superficieController = TextEditingController(
+    text: "10 mt^2",
+  );
 
   @override
   void initState() {
@@ -46,11 +56,8 @@ class _InicioTratamientoState extends State<InicioTratamiento> {
     });
   }
 
-  Future<void> cargarParcelas() async {
-    if (ciudadSeleccionada == null ||
-        serieSeleccionada == null ||
-        bloqueSeleccionado == null)
-      return;
+  Future<void> cargarBloques() async {
+    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
 
     final snapshot =
         await FirebaseFirestore.instance
@@ -59,40 +66,90 @@ class _InicioTratamientoState extends State<InicioTratamiento> {
             .collection('series')
             .doc(serieSeleccionada)
             .collection('bloques')
-            .doc(bloqueSeleccionado)
+            .get();
+
+    setState(() {
+      bloques = snapshot.docs.map((doc) => doc.id).toList();
+    });
+  }
+
+  Future<void> cargarParcelas() async {
+    if (bloqueSeleccionado == null) return;
+
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada!)
+            .collection('series')
+            .doc(serieSeleccionada!)
+            .collection('bloques')
+            .doc(bloqueSeleccionado!)
             .collection('parcelas')
             .orderBy('numero')
             .get();
 
     setState(() {
-      parcelas = snapshot.docs.map((doc) => doc['numero'] as int).toList();
+      parcelas = snapshot.docs;
+    });
+  }
+
+  Future<void> actualizarInfoParcela(String id) async {
+    final doc = parcelas.firstWhere((p) => p.id == id);
+    setState(() {
+      numeroFicha = doc['numero_ficha']?.toString() ?? '';
+      numeroTratamiento = doc['numero_tratamiento']?.toString() ?? '';
     });
   }
 
   void iniciarTratamiento() {
-    if (ciudadSeleccionada != null &&
-        serieSeleccionada != null &&
-        bloqueSeleccionado != null &&
-        parcelaInicial != null) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder:
-              (_) => FormularioTratamiento(
-                ciudadId: ciudadSeleccionada!,
-                serieId: serieSeleccionada!,
-                bloqueId: bloqueSeleccionado!,
-                parcelaDesde: parcelaInicial!,
+    if (ciudadSeleccionada == null ||
+        serieSeleccionada == null ||
+        bloqueSeleccionado == null ||
+        parcelaSeleccionada == null)
+      return;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder:
+            (_) => FormularioTratamiento(
+              ciudadId: ciudadSeleccionada!,
+              serieId: serieSeleccionada!,
+              bloqueId: bloqueSeleccionado!,
+              parcelaDesde: int.parse(
+                parcelas
+                    .firstWhere((p) => p.id == parcelaSeleccionada)['numero']
+                    .toString(),
               ),
-        ),
-      );
-    }
+              numeroFicha: numeroFicha,
+              numeroTratamiento: numeroTratamiento,
+            ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Inicio de tratamiento")),
+      appBar: AppBar(
+        title: const Text("Inicio Tratamiento"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            tooltip: "Cerrar sesión",
+            onPressed: () async {
+              await FirebaseAuth.instance.signOut();
+              if (context.mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(builder: (_) => const LoginScreen()),
+                  (route) => false,
+                );
+              }
+            },
+          ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: ListView(
@@ -101,20 +158,23 @@ class _InicioTratamientoState extends State<InicioTratamiento> {
               value: ciudadSeleccionada,
               decoration: const InputDecoration(labelText: "Ciudad"),
               items:
-                  ciudades.map((doc) {
-                    return DropdownMenuItem(
-                      value: doc.id,
-                      child: Text(doc['nombre']),
-                    );
-                  }).toList(),
+                  ciudades
+                      .map(
+                        (doc) => DropdownMenuItem(
+                          value: doc.id,
+                          child: Text(doc['nombre']),
+                        ),
+                      )
+                      .toList(),
               onChanged: (value) {
                 setState(() {
                   ciudadSeleccionada = value;
                   serieSeleccionada = null;
                   bloqueSeleccionado = null;
-                  parcelaInicial = null;
-                  series = [];
-                  parcelas = [];
+                  parcelaSeleccionada = null;
+                  series.clear();
+                  bloques.clear();
+                  parcelas.clear();
                 });
                 cargarSeries();
               },
@@ -124,19 +184,23 @@ class _InicioTratamientoState extends State<InicioTratamiento> {
               value: serieSeleccionada,
               decoration: const InputDecoration(labelText: "Serie"),
               items:
-                  series.map((doc) {
-                    return DropdownMenuItem(
-                      value: doc.id,
-                      child: Text(doc['nombre']),
-                    );
-                  }).toList(),
+                  series
+                      .map(
+                        (doc) => DropdownMenuItem(
+                          value: doc.id,
+                          child: Text(doc['nombre']),
+                        ),
+                      )
+                      .toList(),
               onChanged: (value) {
                 setState(() {
                   serieSeleccionada = value;
                   bloqueSeleccionado = null;
-                  parcelaInicial = null;
-                  parcelas = [];
+                  parcelaSeleccionada = null;
+                  bloques.clear();
+                  parcelas.clear();
                 });
+                cargarBloques();
               },
             ),
             const SizedBox(height: 10),
@@ -144,43 +208,64 @@ class _InicioTratamientoState extends State<InicioTratamiento> {
               value: bloqueSeleccionado,
               decoration: const InputDecoration(labelText: "Bloque"),
               items:
-                  ['A', 'B', 'C', 'D'].map((bloque) {
-                    return DropdownMenuItem(
-                      value: bloque,
-                      child: Text("Bloque $bloque"),
-                    );
-                  }).toList(),
+                  bloques
+                      .map(
+                        (bloque) => DropdownMenuItem(
+                          value: bloque,
+                          child: Text("Bloque $bloque"),
+                        ),
+                      )
+                      .toList(),
               onChanged: (value) {
                 setState(() {
                   bloqueSeleccionado = value;
-                  parcelaInicial = null;
-                  parcelas = [];
+                  parcelaSeleccionada = null;
+                  parcelas.clear();
                 });
                 cargarParcelas();
               },
             ),
             const SizedBox(height: 10),
-            DropdownButtonFormField<int>(
-              value: parcelaInicial,
+            DropdownButtonFormField<String>(
+              value: parcelaSeleccionada,
               decoration: const InputDecoration(labelText: "Parcela de inicio"),
               items:
-                  parcelas.map((numero) {
-                    return DropdownMenuItem(
-                      value: numero,
-                      child: Text("Parcela $numero"),
-                    );
-                  }).toList(),
+                  parcelas
+                      .map(
+                        (doc) => DropdownMenuItem(
+                          value: doc.id,
+                          child: Text("Parcela ${doc['numero']}"),
+                        ),
+                      )
+                      .toList(),
               onChanged: (value) {
                 setState(() {
-                  parcelaInicial = value;
+                  parcelaSeleccionada = value;
                 });
+                if (value != null) actualizarInfoParcela(value);
               },
+            ),
+            const SizedBox(height: 20),
+            if (numeroFicha.isNotEmpty && numeroTratamiento.isNotEmpty)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text("Número ficha: $numeroFicha"),
+                  Text("Número tratamiento: $numeroTratamiento"),
+                  const SizedBox(height: 10),
+                ],
+              ),
+            TextField(
+              controller: superficieController,
+              decoration: const InputDecoration(
+                labelText: "Superficie cosechable",
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: iniciarTratamiento,
               icon: const Icon(Icons.play_arrow),
-              label: const Text("Empezar tratamiento"),
+              label: const Text("Iniciar tratamiento"),
             ),
           ],
         ),

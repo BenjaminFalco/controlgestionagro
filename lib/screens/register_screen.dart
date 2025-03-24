@@ -56,7 +56,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
           children: [
             TextField(
               controller: emailController,
-              decoration: const InputDecoration(labelText: "Email"),
+              decoration: const InputDecoration(labelText: "Usuario/Email "),
             ),
             TextField(
               controller: passwordController,
