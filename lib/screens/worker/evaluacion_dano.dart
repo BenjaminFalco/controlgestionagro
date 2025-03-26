@@ -1,14 +1,16 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class EvaluacionDanoScreen extends StatefulWidget {
   final DocumentReference parcelaRef;
-  final int totalRaices; // 🔹 NUEVO
+  final int totalRaices;
 
   const EvaluacionDanoScreen({
     super.key,
     required this.parcelaRef,
-    required this.totalRaices, // 🔹 NUEVO
+    required this.totalRaices,
   });
 
   @override
@@ -16,133 +18,332 @@ class EvaluacionDanoScreen extends StatefulWidget {
 }
 
 class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
-  final List<TextEditingController> evaluacionesControllers = [
-    TextEditingController(),
-  ];
+  final AudioPlayer player = AudioPlayer();
+  final TextEditingController cantidadController = TextEditingController();
+  Map<int, int> evaluaciones = {}; // nota -> cantidad
   String mensaje = '';
-  double frecuenciaRelativa = 0.0;
 
-  void agregarCampo() {
-    if (evaluacionesControllers.length >= widget.totalRaices) {
+  @override
+  void initState() {
+    super.initState();
+    cargarEvaluacionDesdeFirestore(); // <- aquí se carga la evaluación previa
+  }
+
+  Widget _buildNotaButton(int nota) {
+    return ElevatedButton(
+      onPressed: faltan > 0 ? () => agregarEvaluacion(nota) : null,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color.fromARGB(255, 213, 182, 9),
+        padding: const EdgeInsets.symmetric(horizontal: 120, vertical: 24),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+      child: Text(
+        "$nota",
+        style: const TextStyle(
+          fontSize: 26,
+          color: Color.fromARGB(255, 0, 0, 0),
+        ),
+      ),
+    );
+  }
+
+  int get evaluadas => evaluaciones.values.fold(0, (a, b) => a + b);
+  int get faltan => widget.totalRaices - evaluadas;
+
+  Future<void> agregarEvaluacion(int nota) async {
+    final cantidad = int.tryParse(cantidadController.text.trim());
+    if (cantidad == null || cantidad <= 0 || cantidad > faltan) {
       setState(() {
-        mensaje = "⚠️ Ya ingresaste todos los valores de daño posibles.";
+        mensaje = "⚠️ Ingresa una cantidad válida (restantes: $faltan).";
       });
       return;
     }
 
     setState(() {
-      evaluacionesControllers.add(TextEditingController());
+      evaluaciones.update(
+        nota,
+        (value) => value + cantidad,
+        ifAbsent: () => cantidad,
+      );
+      cantidadController.clear();
       mensaje = '';
     });
+
+    // 🔊 Feedback sonoro
+    await player.play(AssetSource('sounds/click.mp3'));
   }
 
-  void calcularFrecuencia() {
-    List<double> valores = [];
-
-    for (var c in evaluacionesControllers) {
-      double? valor = double.tryParse(c.text.trim());
-      if (valor == null || valor < 0 || valor > 7) {
-        setState(() {
-          mensaje = "⚠️ Todos los valores deben estar entre 0.0 y 7.0";
-        });
-        return;
-      }
-      valores.add(valor);
+  void borrarUltimo() {
+    if (evaluaciones.isNotEmpty) {
+      final ultimaClave = evaluaciones.keys.last;
+      setState(() {
+        evaluaciones.remove(ultimaClave);
+      });
     }
+  }
 
-    double suma = valores.fold(0, (a, b) => a + b);
-    double resultado = suma / (valores.length * 7);
-
+  void reiniciarEvaluacion() {
     setState(() {
-      frecuenciaRelativa = double.parse(resultado.toStringAsFixed(3));
-      mensaje = "✅ Frecuencia relativa: $frecuenciaRelativa";
+      evaluaciones.clear();
+      mensaje = '';
     });
   }
 
   Future<void> guardarEvaluacion() async {
     try {
-      List<double> valores =
-          evaluacionesControllers
-              .map((c) => double.parse(c.text.trim()))
-              .toList();
+      int suma = evaluaciones.entries
+          .map((e) => e.key * e.value)
+          .fold(0, (a, b) => a + b);
 
-      await widget.parcelaRef.collection('evaluacion_dano').add({
-        "valores": valores,
-        "frecuencia_relativa": frecuenciaRelativa,
-        "fecha": FieldValue.serverTimestamp(),
-      });
+      double frecuencia =
+          widget.totalRaices == 0 ? 0.0 : suma / (widget.totalRaices * 7);
 
       await widget.parcelaRef.update({
-        "evaluacion": valores,
-        "frecuencia_relativa": frecuenciaRelativa,
+        "evaluacion": evaluaciones.map(
+          (key, value) => MapEntry(key.toString(), value),
+        ),
+        "frecuencia_relativa": double.parse(frecuencia.toStringAsFixed(3)),
       });
 
-      setState(() {
-        mensaje = "✅ Evaluación guardada correctamente.";
-      });
+      await player.play(AssetSource('sounds/done.mp3'));
 
-      Navigator.pop(context);
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (_) => AlertDialog(
+                title: const Text("✅ Guardado exitoso"),
+                content: const Text(
+                  "La evaluación ha sido guardada correctamente.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.of(context).pop(); // solo cierra modal
+                    },
+                    child: const Text("Aceptar"),
+                  ),
+                ],
+              ),
+        );
+      }
+
+      await cargarEvaluacionDesdeFirestore(); // Refresca evaluación
     } catch (e) {
-      setState(() {
-        mensaje = "❌ Error: ${e.toString()}";
-      });
+      setState(() => mensaje = "❌ Error al guardar: $e");
+    }
+  }
+
+  Future<void> cargarEvaluacionDesdeFirestore() async {
+    try {
+      final doc = await widget.parcelaRef.get();
+      final data = doc.data() as Map<String, dynamic>?;
+
+      if (data != null && data['evaluacion'] != null) {
+        final mapa = Map<String, dynamic>.from(data['evaluacion']);
+        setState(() {
+          evaluaciones = mapa.map((k, v) => MapEntry(int.parse(k), v as int));
+        });
+      }
+    } catch (e) {
+      setState(() => mensaje = "❌ Error al cargar evaluación: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    int evaluacionesIngresadas = evaluacionesControllers.length;
-    int evaluacionesRestantes = widget.totalRaices - evaluacionesIngresadas;
-
     return Scaffold(
-      appBar: AppBar(title: const Text("Evaluación de daño")),
+      backgroundColor: Colors.grey[900],
+      appBar: AppBar(title: const Text("QUINLEI - Evaluación de daño")),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
-        child: ListView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "🔢 Daño evaluado: $evaluacionesIngresadas / ${widget.totalRaices}",
+              "🔢 Daño evaluado: $evaluadas / ${widget.totalRaices}",
+              style: const TextStyle(color: Colors.white),
             ),
-            Text("⏳ Faltan: $evaluacionesRestantes raíces por evaluar"),
-            const SizedBox(height: 10),
-            ...evaluacionesControllers.asMap().entries.map((entry) {
-              int index = entry.key;
-              TextEditingController controller = entry.value;
+            Text(
+              "⏳ Faltan: $faltan raíces",
+              style: const TextStyle(color: Colors.white70),
+            ),
+            const SizedBox(height: 12),
 
-              return Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: TextField(
-                  controller: controller,
-                  keyboardType: const TextInputType.numberWithOptions(
-                    decimal: true,
+            TextField(
+              controller: cantidadController,
+              readOnly: true, // <- evita teclado Android
+              style: const TextStyle(color: Colors.white),
+              decoration: const InputDecoration(
+                labelText: "Cantidad de raíces",
+                labelStyle: TextStyle(color: Colors.white70),
+                filled: true,
+                fillColor: Colors.black12,
+                border: OutlineInputBorder(),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              alignment: WrapAlignment.center,
+              children: List.generate(10, (index) {
+                return ElevatedButton(
+                  onPressed: () {
+                    setState(() {
+                      cantidadController.text += index.toString();
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 18,
+                    ),
+                    backgroundColor: Colors.blueGrey[800],
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  decoration: InputDecoration(
-                    labelText: "Valor ${index + 1}",
-                    border: const OutlineInputBorder(),
+                  child: Text(
+                    "$index",
+                    style: const TextStyle(fontSize: 24, color: Colors.white),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: () {
+                setState(() {
+                  final texto = cantidadController.text;
+                  if (texto.isNotEmpty) {
+                    cantidadController.text = texto.substring(
+                      0,
+                      texto.length - 1,
+                    );
+                  }
+                });
+              },
+              icon: const Icon(Icons.backspace),
+              label: const Text("Borrar dígito"),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 20,
+                  vertical: 16,
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 12),
+
+            Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children:
+                      [7, 6, 5].map((nota) => _buildNotaButton(nota)).toList(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children:
+                      [4, 3, 2].map((nota) => _buildNotaButton(nota)).toList(),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children:
+                      [1, 0].map((nota) => _buildNotaButton(nota)).toList(),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: borrarUltimo,
+                  icon: const Icon(
+                    Icons.undo,
+                    color: Color.fromARGB(255, 255, 0, 0),
+                  ),
+                  label: const Text(
+                    "Borrar último",
+                    style: TextStyle(color: Colors.white),
                   ),
                 ),
-              );
-            }).toList(),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: agregarCampo,
-              icon: const Icon(Icons.add),
-              label: const Text("Agregar otro valor"),
+                OutlinedButton.icon(
+                  onPressed: reiniciarEvaluacion,
+                  icon: const Icon(Icons.restart_alt, color: Colors.white),
+                  label: const Text(
+                    "Reiniciar",
+                    style: TextStyle(color: Colors.white),
+                  ),
+                ),
+              ],
             ),
+
+            const SizedBox(height: 20),
+            const Divider(color: Colors.white38),
+
+            Text(
+              "📊 Frecuencia acumulada",
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(color: Colors.white),
+            ),
+
             const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: calcularFrecuencia,
-              icon: const Icon(Icons.calculate),
-              label: const Text("Calcular frecuencia relativa"),
+            Expanded(
+              child:
+                  evaluaciones.isEmpty
+                      ? const Center(
+                        child: Text(
+                          "Sin datos aún.",
+                          style: TextStyle(color: Colors.white54),
+                        ),
+                      )
+                      : ListView(
+                        children:
+                            evaluaciones.entries.map((entry) {
+                              final porcentaje = (entry.value /
+                                      widget.totalRaices *
+                                      100)
+                                  .toStringAsFixed(1);
+                              return ListTile(
+                                title: Text(
+                                  "Valor ${entry.key}",
+                                  style: const TextStyle(color: Colors.white),
+                                ),
+                                subtitle: Text(
+                                  "Cantidad: ${entry.value} | ${porcentaje}%",
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                              );
+                            }).toList(),
+                      ),
             ),
             const SizedBox(height: 10),
             ElevatedButton.icon(
               onPressed: guardarEvaluacion,
               icon: const Icon(Icons.save),
               label: const Text("Guardar evaluación"),
+              style: ElevatedButton.styleFrom(
+                minimumSize: const Size.fromHeight(60),
+                backgroundColor: const Color.fromARGB(255, 23, 165, 25),
+              ),
             ),
             const SizedBox(height: 10),
-            Text(mensaje),
+            if (mensaje.isNotEmpty)
+              Text(
+                mensaje,
+                style: TextStyle(
+                  color: mensaje.startsWith("✅") ? Colors.green : Colors.red,
+                ),
+              ),
           ],
         ),
       ),
