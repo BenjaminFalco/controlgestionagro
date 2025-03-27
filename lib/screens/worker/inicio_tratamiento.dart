@@ -129,9 +129,12 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.grey[900],
       appBar: AppBar(
+        backgroundColor: Colors.grey[850],
         title: const Text("Inicio Tratamiento"),
         actions: [
           IconButton(
@@ -150,124 +153,208 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: ListView(
-          children: [
-            DropdownButtonFormField<String>(
-              value: ciudadSeleccionada,
-              decoration: const InputDecoration(labelText: "Ciudad"),
-              items:
-                  ciudades
-                      .map(
-                        (doc) => DropdownMenuItem(
-                          value: doc.id,
-                          child: Text(doc['nombre']),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (value) {
-                setState(() {
-                  ciudadSeleccionada = value;
-                  serieSeleccionada = null;
-                  bloqueSeleccionado = null;
-                  parcelaSeleccionada = null;
-                  series.clear();
-                  bloques.clear();
-                  parcelas.clear();
-                });
-                cargarSeries();
-              },
+      body: GestureDetector(
+        onTap: () => FocusScope.of(context).unfocus(),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                // 🔹 Filtros superiores
+                DropdownButtonFormField<String>(
+                  value: ciudadSeleccionada,
+                  dropdownColor: Colors.grey[800],
+                  decoration: const InputDecoration(
+                    labelText: "Ciudad",
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black12,
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  items:
+                      ciudades
+                          .map(
+                            (doc) => DropdownMenuItem(
+                              value: doc.id,
+                              child: Text(
+                                doc['nombre'],
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      ciudadSeleccionada = value;
+                      serieSeleccionada = null;
+                      bloqueSeleccionado = null;
+                      parcelaSeleccionada = null;
+                      series.clear();
+                      bloques.clear();
+                      parcelas.clear();
+                    });
+                    cargarSeries();
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: serieSeleccionada,
+                  dropdownColor: Colors.grey[800],
+                  decoration: const InputDecoration(
+                    labelText: "Serie",
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black12,
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  items:
+                      series
+                          .map(
+                            (doc) => DropdownMenuItem(
+                              value: doc.id,
+                              child: Text(
+                                doc['nombre'],
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      serieSeleccionada = value;
+                      bloqueSeleccionado = null;
+                      parcelaSeleccionada = null;
+                      bloques.clear();
+                      parcelas.clear();
+                    });
+                    cargarBloques();
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: bloqueSeleccionado,
+                  dropdownColor: Colors.grey[800],
+                  decoration: const InputDecoration(
+                    labelText: "Bloque",
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black12,
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  items:
+                      bloques
+                          .map(
+                            (bloque) => DropdownMenuItem(
+                              value: bloque,
+                              child: Text(
+                                "Bloque $bloque",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      bloqueSeleccionado = value;
+                      parcelaSeleccionada = null;
+                      parcelas.clear();
+                    });
+                    cargarParcelas();
+                  },
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<String>(
+                  value: parcelaSeleccionada,
+                  dropdownColor: Colors.grey[800],
+                  decoration: const InputDecoration(
+                    labelText: "Parcela de inicio",
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black12,
+                  ),
+                  style: const TextStyle(color: Colors.white),
+                  items:
+                      parcelas
+                          .map(
+                            (doc) => DropdownMenuItem(
+                              value: doc.id,
+                              child: Text(
+                                "Parcela ${doc['numero']}",
+                                style: const TextStyle(color: Colors.white),
+                              ),
+                            ),
+                          )
+                          .toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      parcelaSeleccionada = value;
+                    });
+                    if (value != null) actualizarInfoParcela(value);
+                  },
+                ),
+                const SizedBox(height: 8),
+                TextField(
+                  controller: superficieController,
+                  style: const TextStyle(color: Colors.white),
+                  decoration: const InputDecoration(
+                    labelText: "Superficie cosechable",
+                    labelStyle: TextStyle(color: Colors.white70),
+                    filled: true,
+                    fillColor: Colors.black12,
+                    border: OutlineInputBorder(),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // 🔹 Scroll de parcelas
+                Expanded(
+                  child:
+                      parcelas.isEmpty
+                          ? const Center(
+                            child: Text(
+                              "No hay parcelas cargadas.",
+                              style: TextStyle(color: Colors.white60),
+                            ),
+                          )
+                          : ListView.builder(
+                            itemCount: parcelas.length,
+                            itemBuilder: (context, index) {
+                              final doc = parcelas[index];
+                              return Card(
+                                color: Colors.grey[850],
+                                child: ListTile(
+                                  title: Text(
+                                    "Parcela ${doc['numero']}",
+                                    style: const TextStyle(color: Colors.white),
+                                  ),
+                                  trailing: const Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.white70,
+                                  ),
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder:
+                                            (_) => FormularioTratamiento(
+                                              ciudadId: ciudadSeleccionada!,
+                                              serieId: serieSeleccionada!,
+                                              bloqueId: bloqueSeleccionado!,
+                                              parcelaDesde: doc['numero'],
+                                              numeroFicha: numeroFicha,
+                                              numeroTratamiento:
+                                                  numeroTratamiento,
+                                            ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              );
+                            },
+                          ),
+                ),
+              ],
             ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: serieSeleccionada,
-              decoration: const InputDecoration(labelText: "Serie"),
-              items:
-                  series
-                      .map(
-                        (doc) => DropdownMenuItem(
-                          value: doc.id,
-                          child: Text(doc['nombre']),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (value) {
-                setState(() {
-                  serieSeleccionada = value;
-                  bloqueSeleccionado = null;
-                  parcelaSeleccionada = null;
-                  bloques.clear();
-                  parcelas.clear();
-                });
-                cargarBloques();
-              },
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: bloqueSeleccionado,
-              decoration: const InputDecoration(labelText: "Bloque"),
-              items:
-                  bloques
-                      .map(
-                        (bloque) => DropdownMenuItem(
-                          value: bloque,
-                          child: Text("Bloque $bloque"),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (value) {
-                setState(() {
-                  bloqueSeleccionado = value;
-                  parcelaSeleccionada = null;
-                  parcelas.clear();
-                });
-                cargarParcelas();
-              },
-            ),
-            const SizedBox(height: 10),
-            DropdownButtonFormField<String>(
-              value: parcelaSeleccionada,
-              decoration: const InputDecoration(labelText: "Parcela de inicio"),
-              items:
-                  parcelas
-                      .map(
-                        (doc) => DropdownMenuItem(
-                          value: doc.id,
-                          child: Text("Parcela ${doc['numero']}"),
-                        ),
-                      )
-                      .toList(),
-              onChanged: (value) {
-                setState(() {
-                  parcelaSeleccionada = value;
-                });
-                if (value != null) actualizarInfoParcela(value);
-              },
-            ),
-            const SizedBox(height: 20),
-            if (numeroFicha.isNotEmpty && numeroTratamiento.isNotEmpty)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text("Número ficha: $numeroFicha"),
-                  Text("Número tratamiento: $numeroTratamiento"),
-                  const SizedBox(height: 10),
-                ],
-              ),
-            TextField(
-              controller: superficieController,
-              decoration: const InputDecoration(
-                labelText: "Superficie cosechable",
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: iniciarTratamiento,
-              icon: const Icon(Icons.play_arrow),
-              label: const Text("Iniciar tratamiento"),
-            ),
-          ],
+          ),
         ),
       ),
     );

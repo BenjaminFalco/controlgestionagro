@@ -34,13 +34,13 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
       onPressed: faltan > 0 ? () => agregarEvaluacion(nota) : null,
       style: ElevatedButton.styleFrom(
         backgroundColor: const Color.fromARGB(255, 213, 182, 9),
-        padding: const EdgeInsets.symmetric(horizontal: 120, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 150, vertical: 24),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
       child: Text(
         "$nota",
         style: const TextStyle(
-          fontSize: 26,
+          fontSize: 40,
           color: Color.fromARGB(255, 0, 0, 0),
         ),
       ),
@@ -236,7 +236,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
               ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 5),
 
             Column(
               children: [
@@ -315,7 +315,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                                   .toStringAsFixed(1);
                               return ListTile(
                                 title: Text(
-                                  "Valor ${entry.key}",
+                                  "Nota ${entry.key}",
                                   style: const TextStyle(color: Colors.white),
                                 ),
                                 subtitle: Text(
