@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin/admin_dashboard.dart';
 import 'worker/worker_dashboard.dart';
+import 'login_screen.dart';
 
 class SetupScreen extends StatefulWidget {
   const SetupScreen({super.key});
@@ -27,10 +28,7 @@ class _SetupScreenState extends State<SetupScreen> {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
       DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance
-              .collection('usuarios')
-              .doc(uid)
-              .get();
+          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
@@ -48,10 +46,8 @@ class _SetupScreenState extends State<SetupScreen> {
 
   Future<void> saveUserInfo() async {
     try {
-      // 🔹 Obtener UID del usuario actual
       String uid = FirebaseAuth.instance.currentUser!.uid;
 
-      // 🔹 Guardar los datos en Firestore
       await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
         "nombre": nameController.text.trim(),
         "telefono": phoneController.text.trim(),
@@ -60,7 +56,6 @@ class _SetupScreenState extends State<SetupScreen> {
 
       print("✅ Datos guardados en Firestore correctamente.");
 
-      // 🔥 Redirigir al usuario según el rol seleccionado
       if (selectedRole == "admin") {
         Navigator.pushReplacement(
           context,
@@ -84,52 +79,149 @@ class _SetupScreenState extends State<SetupScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text("Configuración Inicial")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "Completa tu información antes de continuar",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: nameController,
-              decoration: const InputDecoration(labelText: "Nombre"),
-            ),
-            TextField(
-              controller: phoneController,
-              decoration: const InputDecoration(labelText: "Teléfono"),
-              keyboardType: TextInputType.phone,
-            ),
-            const SizedBox(height: 10),
-            DropdownButton<String>(
-              value: selectedRole,
-              onChanged: (String? newValue) {
-                setState(() {
-                  selectedRole = newValue!;
-                });
-              },
-              items:
-                  <String>['trabajador', 'admin'].map<DropdownMenuItem<String>>(
-                    (String value) {
-                      return DropdownMenuItem<String>(
-                        value: value,
-                        child: Text(value),
+      backgroundColor: Colors.black,
+      body: Center(
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 350),
+            child: Padding(
+              padding: const EdgeInsets.all(24.0),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    "Completa tu información antes de continuar",
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // Campo: Nombre
+                  TextField(
+                    controller: nameController,
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: "Nombre",
+                      labelStyle: TextStyle(color: Colors.white, fontSize: 18),
+                      filled: true,
+                      fillColor: Colors.black,
+                      contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white, width: 2),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Campo: Teléfono
+                  TextField(
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                    decoration: const InputDecoration(
+                      labelText: "Teléfono",
+                      labelStyle: TextStyle(color: Colors.white, fontSize: 18),
+                      filled: true,
+                      fillColor: Colors.black,
+                      contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                      border: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderSide: BorderSide(color: Colors.white, width: 2),
+                        borderRadius: BorderRadius.all(Radius.circular(8)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Dropdown: Rol
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.white),
+                      borderRadius: BorderRadius.circular(8),
+                      color: Colors.black,
+                    ),
+                    child: DropdownButton<String>(
+                      value: selectedRole,
+                      dropdownColor: Colors.black,
+                      isExpanded: true,
+                      style: const TextStyle(color: Colors.white, fontSize: 18),
+                      underline: const SizedBox(),
+                      iconEnabledColor: Colors.white,
+                      onChanged: (String? newValue) {
+                        setState(() {
+                          selectedRole = newValue!;
+                        });
+                      },
+                      items: <String>['trabajador', 'admin']
+                          .map<DropdownMenuItem<String>>((String value) {
+                        return DropdownMenuItem<String>(
+                          value: value,
+                          child: Text(value),
+                        );
+                      }).toList(),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  if (errorMessage.isNotEmpty)
+                    Text(errorMessage, style: const TextStyle(color: Colors.red)),
+                  const SizedBox(height: 20),
+
+                  ElevatedButton(
+                    onPressed: saveUserInfo,
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
+                      backgroundColor: Colors.deepPurpleAccent,
+                      foregroundColor: Colors.white,
+                      textStyle: const TextStyle(fontSize: 20),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: const Text("Guardar"),
+                  ),
+                  const SizedBox(height: 25),
+
+                  // Botón: Volver al login
+                  TextButton(
+                    onPressed: () {
+                      FirebaseAuth.instance.signOut();
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const LoginScreen()),
                       );
                     },
-                  ).toList(),
+                    child: const Text(
+                      "Volver al login",
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-            const SizedBox(height: 10),
-            if (errorMessage.isNotEmpty)
-              Text(errorMessage, style: const TextStyle(color: Colors.red)),
-            const SizedBox(height: 10),
-            ElevatedButton(
-              onPressed: saveUserInfo,
-              child: const Text("Guardar"),
-            ),
-          ],
+          ),
         ),
       ),
     );

@@ -180,38 +180,44 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 filled: true,
                 fillColor: Colors.black12,
                 border: OutlineInputBorder(),
+              
               ),
             ),
 
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              alignment: WrapAlignment.center,
-              children: List.generate(10, (index) {
-                return ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      cantidadController.text += index.toString();
-                    });
-                  },
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 18,
-                    ),
-                    backgroundColor: Colors.blueGrey[800],
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Text(
-                    "$index",
-                    style: const TextStyle(fontSize: 24, color: Colors.white),
-                  ),
-                );
-              }),
+            const SizedBox(height: 32),
+            Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 9.0),
+  child: Wrap(
+    spacing: 16,
+    runSpacing: 16,
+    alignment: WrapAlignment.center,
+    children: List.generate(10, (index) {
+      return SizedBox(
+        width: 70,
+        height: 70,
+        child: ElevatedButton(
+          onPressed: () {
+            setState(() {
+              cantidadController.text += index.toString();
+            });
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.blue[700],
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
             ),
+          ),
+          child: Text(
+            "$index",
+            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+          ),
+        ),
+      );
+    }),
+  ),
+),
+
             const SizedBox(height: 8),
             ElevatedButton.icon(
               onPressed: () {

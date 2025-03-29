@@ -128,235 +128,306 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
     );
   }
 
-  @override
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.grey[900],
-      appBar: AppBar(
-        backgroundColor: Colors.grey[850],
-        title: const Text("Inicio Tratamiento"),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: "Cerrar sesión",
-            onPressed: () async {
-              await FirebaseAuth.instance.signOut();
-              if (context.mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(builder: (_) => const LoginScreen()),
-                  (route) => false,
-                );
-              }
-            },
-          ),
-        ],
+@override
+Widget build(BuildContext context) {
+  return Scaffold(
+    backgroundColor: Colors.black,
+    appBar: AppBar(
+      backgroundColor: Colors.white,
+      title: const Text(
+        "Inicio de Tratamiento",
+        style: TextStyle(
+          fontSize: 24,
+          fontWeight: FontWeight.bold,
+          color: Colors.black,
+        ),
       ),
-      body: GestureDetector(
-        onTap: () => FocusScope.of(context).unfocus(),
-        child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              children: [
-                // 🔹 Filtros superiores
-                DropdownButtonFormField<String>(
-                  value: ciudadSeleccionada,
-                  dropdownColor: Colors.grey[800],
-                  decoration: const InputDecoration(
-                    labelText: "Ciudad",
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.black12,
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  items:
-                      ciudades
-                          .map(
-                            (doc) => DropdownMenuItem(
-                              value: doc.id,
-                              child: Text(
-                                doc['nombre'],
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      ciudadSeleccionada = value;
-                      serieSeleccionada = null;
-                      bloqueSeleccionado = null;
-                      parcelaSeleccionada = null;
-                      series.clear();
-                      bloques.clear();
-                      parcelas.clear();
-                    });
-                    cargarSeries();
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: serieSeleccionada,
-                  dropdownColor: Colors.grey[800],
-                  decoration: const InputDecoration(
-                    labelText: "Serie",
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.black12,
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  items:
-                      series
-                          .map(
-                            (doc) => DropdownMenuItem(
-                              value: doc.id,
-                              child: Text(
-                                doc['nombre'],
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      serieSeleccionada = value;
-                      bloqueSeleccionado = null;
-                      parcelaSeleccionada = null;
-                      bloques.clear();
-                      parcelas.clear();
-                    });
-                    cargarBloques();
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: bloqueSeleccionado,
-                  dropdownColor: Colors.grey[800],
-                  decoration: const InputDecoration(
-                    labelText: "Bloque",
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.black12,
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  items:
-                      bloques
-                          .map(
-                            (bloque) => DropdownMenuItem(
-                              value: bloque,
-                              child: Text(
-                                "Bloque $bloque",
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      bloqueSeleccionado = value;
-                      parcelaSeleccionada = null;
-                      parcelas.clear();
-                    });
-                    cargarParcelas();
-                  },
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<String>(
-                  value: parcelaSeleccionada,
-                  dropdownColor: Colors.grey[800],
-                  decoration: const InputDecoration(
-                    labelText: "Parcela de inicio",
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.black12,
-                  ),
-                  style: const TextStyle(color: Colors.white),
-                  items:
-                      parcelas
-                          .map(
-                            (doc) => DropdownMenuItem(
-                              value: doc.id,
-                              child: Text(
-                                "Parcela ${doc['numero']}",
-                                style: const TextStyle(color: Colors.white),
-                              ),
-                            ),
-                          )
-                          .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      parcelaSeleccionada = value;
-                    });
-                    if (value != null) actualizarInfoParcela(value);
-                  },
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: superficieController,
-                  style: const TextStyle(color: Colors.white),
-                  decoration: const InputDecoration(
-                    labelText: "Superficie cosechable",
-                    labelStyle: TextStyle(color: Colors.white70),
-                    filled: true,
-                    fillColor: Colors.black12,
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // 🔹 Scroll de parcelas
-                Expanded(
-                  child:
-                      parcelas.isEmpty
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.logout, color: Colors.black),
+          tooltip: "Cerrar sesión",
+          onPressed: () async {
+            await FirebaseAuth.instance.signOut();
+            if (context.mounted) {
+              Navigator.pushAndRemoveUntil(
+                context,
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
+              );
+            }
+          },
+        ),
+      ],
+    ),
+    body: GestureDetector(
+      onTap: () => FocusScope.of(context).unfocus(),
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 500),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 12),
+                    _buildFieldBox(
+                      _buildDropdown(
+                        "Ciudad",
+                        ciudadSeleccionada,
+                        ciudades.map((doc) {
+                          return DropdownMenuItem(
+                            value: doc.id,
+                            child: Text(doc['nombre'],
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 20)),
+                          );
+                        }).toList(),
+                        (value) {
+                          setState(() {
+                            ciudadSeleccionada = value;
+                            serieSeleccionada = null;
+                            bloqueSeleccionado = null;
+                            parcelaSeleccionada = null;
+                            series.clear();
+                            bloques.clear();
+                            parcelas.clear();
+                          });
+                          cargarSeries();
+                        },
+                      ),
+                    ),
+                    _buildFieldBox(
+                      _buildDropdown(
+                        "Serie",
+                        serieSeleccionada,
+                        series.map((doc) {
+                          return DropdownMenuItem(
+                            value: doc.id,
+                            child: Text(doc['nombre'],
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 20)),
+                          );
+                        }).toList(),
+                        (value) {
+                          setState(() {
+                            serieSeleccionada = value;
+                            bloqueSeleccionado = null;
+                            parcelaSeleccionada = null;
+                            bloques.clear();
+                            parcelas.clear();
+                          });
+                          cargarBloques();
+                        },
+                      ),
+                    ),
+                    _buildFieldBox(
+                      _buildDropdown(
+                        "Bloque",
+                        bloqueSeleccionado,
+                        bloques.map((b) {
+                          return DropdownMenuItem(
+                            value: b,
+                            child: Text("Bloque $b",
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 20)),
+                          );
+                        }).toList(),
+                        (value) {
+                          setState(() {
+                            bloqueSeleccionado = value;
+                            parcelaSeleccionada = null;
+                            parcelas.clear();
+                          });
+                          cargarParcelas();
+                        },
+                      ),
+                    ),
+                    _buildFieldBox(
+                      _buildDropdown(
+                        "Parcela de inicio",
+                        parcelaSeleccionada,
+                        parcelas.map((doc) {
+                          return DropdownMenuItem(
+                            value: doc.id,
+                            child: Text("Parcela ${doc['numero']}",
+                                style: const TextStyle(
+                                    color: Colors.white, fontSize: 20)),
+                          );
+                        }).toList(),
+                        (value) {
+                          setState(() {
+                            parcelaSeleccionada = value;
+                          });
+                          if (value != null) actualizarInfoParcela(value);
+                        },
+                      ),
+                    ),
+                    _buildFieldBox(
+                      TextField(
+                        controller: superficieController,
+                        style: const TextStyle(color: Colors.white, fontSize: 20),
+                        decoration: const InputDecoration(
+                          hintText: "Superficie cosechable (m²)",
+                          hintStyle:
+                              TextStyle(color: Colors.white70, fontSize: 18),
+                          border: InputBorder.none,
+                        ),
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // 🔹 Lista de parcelas
+                    SizedBox(
+                      height: 200,
+                      child: parcelas.isEmpty
                           ? const Center(
-                            child: Text(
-                              "No hay parcelas cargadas.",
-                              style: TextStyle(color: Colors.white60),
-                            ),
-                          )
+                              child: Text(
+                                "No hay parcelas cargadas.",
+                                style:
+                                    TextStyle(color: Colors.white60, fontSize: 18),
+                              ),
+                            )
                           : ListView.builder(
-                            itemCount: parcelas.length,
-                            itemBuilder: (context, index) {
-                              final doc = parcelas[index];
-                              return Card(
-                                color: Colors.grey[850],
-                                child: ListTile(
-                                  title: Text(
-                                    "Parcela ${doc['numero']}",
-                                    style: const TextStyle(color: Colors.white),
+                              itemCount: parcelas.length,
+                              itemBuilder: (context, index) {
+                                final doc = parcelas[index];
+                                return Card(
+                                  color: Colors.grey[850],
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(16),
                                   ),
-                                  trailing: const Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.white70,
-                                  ),
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => FormularioTratamiento(
-                                              ciudadId: ciudadSeleccionada!,
-                                              serieId: serieSeleccionada!,
-                                              bloqueId: bloqueSeleccionado!,
-                                              parcelaDesde: doc['numero'],
-                                              numeroFicha: numeroFicha,
-                                              numeroTratamiento:
-                                                  numeroTratamiento,
-                                            ),
+                                  elevation: 4,
+                                  margin:
+                                      const EdgeInsets.symmetric(vertical: 10),
+                                  child: ListTile(
+                                    contentPadding: const EdgeInsets.symmetric(
+                                        horizontal: 20, vertical: 16),
+                                    title: Text(
+                                      "Parcela ${doc['numero']}",
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 22,
                                       ),
-                                    );
-                                  },
-                                ),
-                              );
-                            },
+                                    ),
+                                    trailing: const Icon(
+                                      Icons.arrow_forward_ios,
+                                      color: Colors.white70,
+                                    ),
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => FormularioTratamiento(
+                                            ciudadId: ciudadSeleccionada!,
+                                            serieId: serieSeleccionada!,
+                                            bloqueId: bloqueSeleccionado!,
+                                            parcelaDesde: doc['numero'],
+                                            numeroFicha: numeroFicha,
+                                            numeroTratamiento:
+                                                numeroTratamiento,
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+
+                    const SizedBox(height: 20),
+
+                    // 🔹 Botón grande
+                    SizedBox(
+                      width: 300,
+                      height: 60,
+                      child: ElevatedButton.icon(
+                        onPressed: parcelaSeleccionada != null
+                            ? () {
+                                final doc = parcelas.firstWhere(
+                                    (p) => p.id == parcelaSeleccionada);
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (_) => FormularioTratamiento(
+                                      ciudadId: ciudadSeleccionada!,
+                                      serieId: serieSeleccionada!,
+                                      bloqueId: bloqueSeleccionado!,
+                                      parcelaDesde: doc['numero'],
+                                      numeroFicha: numeroFicha,
+                                      numeroTratamiento: numeroTratamiento,
+                                    ),
+                                  ),
+                                );
+                              }
+                            : null,
+                        icon: const Icon(Icons.play_arrow, size: 28),
+                        label: const Text(
+                          "EMPEZAR TRATAMIENTO",
+                          style: TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.bold),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.deepPurpleAccent,
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
                           ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                  ],
                 ),
-              ],
+              ),
             ),
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
+
+// 🔧 Dropdown estilizado
+Widget _buildDropdown(
+  String label,
+  String? value,
+  List<DropdownMenuItem<String>> items,
+  Function(String?) onChanged,
+) {
+  return DropdownButtonFormField<String>(
+  value: value,
+  dropdownColor: Colors.grey[900],
+  decoration: InputDecoration(
+  labelText: label,
+  labelStyle: const TextStyle(color: Colors.white70, fontSize: 20),
+  filled: true,
+  fillColor: Colors.transparent,
+  enabledBorder: InputBorder.none,
+  focusedBorder: InputBorder.none,
+  border: InputBorder.none,
+),
+
+  style: const TextStyle(color: Colors.white, fontSize: 20), // <- TEXTOS SELECCIONADOS
+  items: items,
+  onChanged: onChanged,
+);
+}
+
+// 🧩 Caja visual para inputs
+Widget _buildFieldBox(Widget child) {
+  return Container(
+    margin: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    width: double.infinity,
+    decoration: BoxDecoration(
+      color: Colors.grey[850],
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: child,
+  );
+}
 }

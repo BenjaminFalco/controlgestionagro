@@ -167,11 +167,13 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("Iniciar sesión")),
-      body: Padding(
+ @override
+Widget build(BuildContext context) {
+  return Scaffold(
+    appBar: AppBar(title: const Text("Iniciar sesión")),
+    backgroundColor: Colors.black,
+    body: Center(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -182,61 +184,135 @@ class _LoginScreenState extends State<LoginScreen> {
                 children: [
                   const Text(
                     "Usuarios recientes:",
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        fontSize: 18),
                   ),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 10,
-                    children:
-                        usuariosRecientes.map((email) {
-                          return ActionChip(
-                            label: Text(email),
-                            onPressed:
-                                () => setState(
-                                  () => emailController.text = email,
-                                ),
-                          );
-                        }).toList(),
+                    children: usuariosRecientes.map((email) {
+                      return ActionChip(
+                        label: Text(email),
+                        onPressed: () =>
+                            setState(() => emailController.text = email),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 20),
                 ],
               ),
-            TextField(
-              controller: emailController,
-              decoration: const InputDecoration(labelText: "Usuario/Email"),
-            ),
-            TextField(
-              controller: passwordController,
-              decoration: const InputDecoration(labelText: "Contraseña"),
-              obscureText: true,
-            ),
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: recuperarContrasena,
-                child: const Text("¿Olvidaste tu contraseña?"),
+            SizedBox(
+              width: 300,
+              child: TextField(
+                controller: emailController,
+                style: const TextStyle(fontSize: 20, color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: "Usuario/Email",
+                  labelStyle: TextStyle(color: Colors.white, fontSize: 18),
+                  filled: true,
+                  fillColor: Colors.black,
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white, width: 2),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                ),
               ),
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: 300,
+              child: TextField(
+                controller: passwordController,
+                obscureText: true,
+                style: const TextStyle(fontSize: 20, color: Colors.white),
+                decoration: const InputDecoration(
+                  labelText: "Contraseña",
+                  labelStyle: TextStyle(color: Colors.white, fontSize: 18),
+                  filled: true,
+                  fillColor: Colors.black,
+                  contentPadding:
+                      EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+                  border: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderSide: BorderSide(color: Colors.white, width: 2),
+                    borderRadius: BorderRadius.all(Radius.circular(8)),
+                  ),
+                ),
+              ),
+            ),
+           const SizedBox(height: 5),
+
+            SizedBox(
+              width: 300,
+              child: Center(
+                child: TextButton(
+                  onPressed: () {
+                    // lógica para recuperar contraseña
+                  },
+                  child: const Text(
+                    '¿Olvidaste tu contraseña?',
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            
             const SizedBox(height: 8),
             if (errorMessage.isNotEmpty)
-              Text(errorMessage, style: const TextStyle(color: Colors.red)),
+              Text(errorMessage,
+                  style: const TextStyle(color: Colors.red)),
             const SizedBox(height: 10),
             ElevatedButton.icon(
               onPressed: loginUser,
-              icon: const Icon(Icons.login),
-              label: const Text("Iniciar sesión"),
+              icon: const Icon(Icons.login, size: 28),
+              label: const Text(
+                "Iniciar sesión",
+                style: TextStyle(fontSize: 22),
+              ),
+              style: ElevatedButton.styleFrom(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              ),
             ),
             const SizedBox(height: 10),
             ElevatedButton.icon(
               onPressed: loginWithGoogle,
-              icon: const Icon(Icons.g_mobiledata),
-              label: const Text("Iniciar con Google"),
+              icon: const Icon(Icons.g_mobiledata, size: 28),
+              label: const Text(
+                "Iniciar con Google",
+                style: TextStyle(fontSize: 22),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.white,
                 foregroundColor: Colors.black,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               ),
             ),
+            const SizedBox(height: 16),
             TextButton(
               onPressed: () {
                 Navigator.push(
@@ -244,11 +320,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   MaterialPageRoute(builder: (_) => const RegisterScreen()),
                 );
               },
-              child: const Text("¿No tienes cuenta? Regístrate aquí"),
+              child: const Text(
+                "¿No tienes cuenta? Regístrate aquí",
+                style: TextStyle(fontSize: 18, color: Colors.white),
+              ),
             ),
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }
