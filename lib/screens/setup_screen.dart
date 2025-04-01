@@ -15,7 +15,7 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   final TextEditingController nameController = TextEditingController();
   final TextEditingController phoneController = TextEditingController();
-  String selectedRole = 'trabajador'; // Valor por defecto
+  String selectedRole = 'trabajador';
   String errorMessage = '';
 
   @override
@@ -27,8 +27,10 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> _loadUserData() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      DocumentSnapshot userDoc =
-          await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+      DocumentSnapshot userDoc = await FirebaseFirestore.instance
+          .collection('usuarios')
+          .doc(uid)
+          .get();
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
@@ -78,8 +80,16 @@ class _SetupScreenState extends State<SetupScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Configuración Inicial")),
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF005A56), // Azul petróleo IANSA
+        centerTitle: true,
+        elevation: 0,
+        title: Image.asset(
+          'assets/images/iansa_logo.jpeg',
+          height: 40,
+        ),
+      ),
       body: Center(
         child: SingleChildScrollView(
           child: ConstrainedBox(
@@ -92,92 +102,28 @@ class _SetupScreenState extends State<SetupScreen> {
                   const Text(
                     "Completa tu información antes de continuar",
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF004D4C),
+                    ),
                   ),
                   const SizedBox(height: 24),
 
-                  // Campo: Nombre
-                  TextField(
+                  _buildTextField(
                     controller: nameController,
-                    style: const TextStyle(fontSize: 20, color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: "Nombre",
-                      labelStyle: TextStyle(color: Colors.white, fontSize: 18),
-                      filled: true,
-                      fillColor: Colors.black,
-                      contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                    ),
+                    label: "Nombre",
                   ),
                   const SizedBox(height: 16),
 
-                  // Campo: Teléfono
-                  TextField(
+                  _buildTextField(
                     controller: phoneController,
+                    label: "Teléfono",
                     keyboardType: TextInputType.phone,
-                    style: const TextStyle(fontSize: 20, color: Colors.white),
-                    decoration: const InputDecoration(
-                      labelText: "Teléfono",
-                      labelStyle: TextStyle(color: Colors.white, fontSize: 18),
-                      filled: true,
-                      fillColor: Colors.black,
-                      contentPadding: EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-                      border: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderSide: BorderSide(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.all(Radius.circular(8)),
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 16),
 
-                  // Dropdown: Rol
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      border: Border.all(color: Colors.white),
-                      borderRadius: BorderRadius.circular(8),
-                      color: Colors.black,
-                    ),
-                    child: DropdownButton<String>(
-                      value: selectedRole,
-                      dropdownColor: Colors.black,
-                      isExpanded: true,
-                      style: const TextStyle(color: Colors.white, fontSize: 18),
-                      underline: const SizedBox(),
-                      iconEnabledColor: Colors.white,
-                      onChanged: (String? newValue) {
-                        setState(() {
-                          selectedRole = newValue!;
-                        });
-                      },
-                      items: <String>['trabajador', 'admin']
-                          .map<DropdownMenuItem<String>>((String value) {
-                        return DropdownMenuItem<String>(
-                          value: value,
-                          child: Text(value),
-                        );
-                      }).toList(),
-                    ),
-                  ),
+                  _buildDropdown(),
 
                   const SizedBox(height: 20),
 
@@ -188,32 +134,31 @@ class _SetupScreenState extends State<SetupScreen> {
                   ElevatedButton(
                     onPressed: saveUserInfo,
                     style: ElevatedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
-                      backgroundColor: Colors.deepPurpleAccent,
+                      backgroundColor: const Color(0xFF00B140), // Verde IANSA
                       foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
                       textStyle: const TextStyle(fontSize: 20),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                     ),
                     child: const Text("Guardar"),
                   ),
                   const SizedBox(height: 25),
 
-                  // Botón: Volver al login
                   TextButton(
                     onPressed: () {
                       FirebaseAuth.instance.signOut();
                       Navigator.pushReplacement(
                         context,
-                        MaterialPageRoute(builder: (context) => const LoginScreen()),
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
                       );
                     },
                     child: const Text(
                       "Volver al login",
                       style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
+                        color: Colors.black87,
+                        fontSize: 18,
                         decoration: TextDecoration.underline,
                       ),
                     ),
@@ -223,6 +168,67 @@ class _SetupScreenState extends State<SetupScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    TextInputType keyboardType = TextInputType.text,
+  }) {
+    return TextField(
+      controller: controller,
+      keyboardType: keyboardType,
+      style: const TextStyle(fontSize: 20, color: Colors.black),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.black87, fontSize: 18),
+        filled: true,
+        fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        border: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.black),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Colors.black),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderSide: const BorderSide(color: Color(0xFF005A56), width: 2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.black),
+        borderRadius: BorderRadius.circular(8),
+        color: Colors.white,
+      ),
+      child: DropdownButton<String>(
+        value: selectedRole,
+        dropdownColor: Colors.white,
+        isExpanded: true,
+        style: const TextStyle(color: Colors.black, fontSize: 18),
+        underline: const SizedBox(),
+        iconEnabledColor: Colors.black,
+        onChanged: (String? newValue) {
+          setState(() {
+            selectedRole = newValue!;
+          });
+        },
+        items: ['trabajador', 'admin'].map((String value) {
+          return DropdownMenuItem<String>(
+            value: value,
+            child: Text(value),
+          );
+        }).toList(),
       ),
     );
   }

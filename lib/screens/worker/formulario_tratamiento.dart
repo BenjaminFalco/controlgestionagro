@@ -39,71 +39,42 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
   String mensaje = '';
   List<Map<String, dynamic>> registros = [];
   String? nombreTrabajador;
+  String? ciudadNombre;
+  String? serieNombre;
 
   @override
   void initState() {
     super.initState();
     cargarNombreTrabajador();
-    cargarParcelasDesde().then((_) => cargarRegistrosTratamiento());
+    cargarParcelasDesde().then((_) => cargarUltimoTratamiento());
+    obtenerNombres();
   }
 
   Future<void> cargarNombreTrabajador() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final snapshot =
-        await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+    final snapshot = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
 
     setState(() {
-      nombreTrabajador = snapshot['nombre'] ?? 'Desconocido';
+      nombreTrabajador = snapshot.data()?['nombre'] ?? FirebaseAuth.instance.currentUser?.email ?? 'Desconocido';
     });
   }
 
   Future<void> cargarParcelasDesde() async {
-    final snapshot =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(widget.ciudadId)
-            .collection('series')
-            .doc(widget.serieId)
-            .collection('bloques')
-            .doc(widget.bloqueId)
-            .collection('parcelas')
-            .orderBy('numero')
-            .get();
+    final snapshot = await FirebaseFirestore.instance
+        .collection('ciudades')
+        .doc(widget.ciudadId)
+        .collection('series')
+        .doc(widget.serieId)
+        .collection('bloques')
+        .doc(widget.bloqueId)
+        .collection('parcelas')
+        .orderBy('numero')
+        .get();
 
     final todas = snapshot.docs;
     final desde = todas.indexWhere((p) => p['numero'] == widget.parcelaDesde);
     setState(() {
       parcelas = todas.sublist(desde);
-    });
-  }
-
-  Future<void> cargarRegistrosTratamiento() async {
-    if (parcelas.isEmpty) return;
-
-    final parcela = parcelas[currentIndex];
-    final snap = await parcela.reference.collection('tratamientos').get();
-
-    final List<Map<String, dynamic>> nuevosRegistros = [];
-
-    for (var doc in snap.docs) {
-      final data = doc.data();
-      final detalle = data['detalle'] as List<dynamic>?;
-
-      if (detalle != null) {
-        for (var r in detalle) {
-          if (r is Map<String, dynamic>) {
-            nuevosRegistros.add({
-              'nombre': r['nombre'] ?? 'Desconocido',
-              'cantidad': r['cantidad'] as int? ?? 0,
-              'peso': r['peso'] is num ? (r['peso'] as num).toDouble() : 0.0,
-            });
-          }
-        }
-      }
-    }
-
-    setState(() {
-      registros = nuevosRegistros;
     });
   }
 
@@ -115,9 +86,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     final observaciones = observacionesController.text.trim();
 
     if (cantidad == null || peso == null || hojas == null || ndvi == null) {
-      setState(
-        () => mensaje = "⚠️ Todos los campos numéricos deben ser válidos.",
-      );
+      setState(() => mensaje = "⚠️ Todos los campos numéricos deben ser válidos.");
       return;
     }
 
@@ -129,6 +98,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
         "nombre": trabajador.email,
         "cantidad": cantidad,
         "peso": peso,
+        "bloque": widget.bloqueId,
       });
       mensaje = '';
       raicesController.clear();
@@ -139,24 +109,62 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     });
   }
 
+  Future<void> obtenerNombres() async {
+    try {
+      final ciudadDoc = await FirebaseFirestore.instance.collection('ciudades').doc(widget.ciudadId).get();
+      final serieDoc = await FirebaseFirestore.instance
+          .collection('ciudades')
+          .doc(widget.ciudadId)
+          .collection('series')
+          .doc(widget.serieId)
+          .get();
+
+      setState(() {
+        ciudadNombre = ciudadDoc.data()?['nombre'] ?? 'Ciudad';
+        serieNombre = serieDoc.data()?['nombre'] ?? 'Serie';
+      });
+    } catch (e) {
+      setState(() {
+        ciudadNombre = 'Ciudad';
+        serieNombre = 'Serie';
+      });
+    }
+  }
+
+  Future<void> cargarUltimoTratamiento() async {
+    if (parcelas.isEmpty) return;
+
+    final parcela = parcelas[currentIndex];
+    final snap = await parcela.reference.collection('tratamientos').orderBy('fecha', descending: true).limit(1).get();
+
+    if (snap.docs.isNotEmpty) {
+      final data = snap.docs.first.data();
+      final detalle = data['detalle'] as List<dynamic>?;
+
+      if (detalle != null) {
+        setState(() {
+          registros = detalle
+              .whereType<Map<String, dynamic>>()
+              .map((r) => {
+                    'nombre': r['nombre'] ?? 'Desconocido',
+                    'cantidad': r['cantidad'] as int? ?? 0,
+                    'peso': r['peso'] is num ? (r['peso'] as num).toDouble() : 0.0,
+                  })
+              .toList();
+        });
+      }
+    }
+  }
+
   Future<void> guardarTratamiento() async {
     final parcela = parcelas[currentIndex];
-
-    final totalRaices = registros.fold<int>(
-      0,
-      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
-    );
-
-    final totalPeso = registros.fold<double>(
-      0.0,
-      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
-    );
+    final totalRaices = registros.fold<int>(0, (sum, r) => sum + (r['cantidad'] as int? ?? 0));
+    final totalPeso = registros.fold<double>(0.0, (sum, r) => sum + (r['peso'] as double? ?? 0.0));
 
     try {
       await parcela.reference.collection('tratamientos').add({
         "trabajador_id": FirebaseAuth.instance.currentUser?.uid,
-        "nombre":
-            registros.isNotEmpty ? registros.last['nombre'] : 'Desconocido',
+        "nombre": registros.isNotEmpty ? registros.last['nombre'] : 'Desconocido',
         "detalle": registros,
         "fecha": Timestamp.now(),
         "total_raices": totalRaices,
@@ -165,6 +173,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
       setState(() {
         mensaje = "✅ Tratamiento guardado.";
+        registros = [];
       });
 
       if (currentIndex < parcelas.length - 1) {
@@ -180,8 +189,62 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       });
     }
   }
+  Future<void> reiniciarTratamiento() async {
+    final parcela = parcelas[currentIndex];
+    final snap = await parcela.reference.collection('tratamientos').get();
 
-  void irAEvaluacionDano() {
+    for (final doc in snap.docs) {
+      await doc.reference.delete();
+    }
+
+    setState(() {
+      registros.clear();
+      mensaje = "⚠️ Tratamiento eliminado.";
+    });
+  }
+   void confirmarYSiguiente() {
+    if (registros.isEmpty) {
+      showDialog(
+        context: context,
+        builder:
+            (context) => AlertDialog(
+              title: const Text("¿Avanzar sin guardar?"),
+              content: const Text(
+                "Aún no has registrado ningún dato en esta parcela.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Cancelar"),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    if (currentIndex < parcelas.length - 1) {
+                      setState(() {
+                        registros.clear();
+                        mensaje = '';
+                        currentIndex++;
+                      });
+                    }
+                  },
+                  child: const Text("Avanzar"),
+                ),
+              ],
+            ),
+      );
+    } else {
+      if (currentIndex < parcelas.length - 1) {
+        setState(() {
+          registros.clear();
+          mensaje = '';
+          currentIndex++;
+        });
+      }
+    }
+  }
+
+    void irAEvaluacionDano() {
     final totalRaices = registros.fold<int>(
       0,
       (sum, r) => sum + (r['cantidad'] as int? ?? 0),
@@ -200,6 +263,24 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     );
   }
 
+  Widget _buildInput(String label, TextEditingController controller, {int maxLines = 1}) {
+    return SizedBox(
+      width: 300,
+      child: TextField(
+        controller: controller,
+        maxLines: maxLines,
+        style: const TextStyle(fontSize: 18, color: Colors.black),
+        decoration: InputDecoration(
+          labelText: label,
+          labelStyle: const TextStyle(fontSize: 18, color: Colors.black),
+          filled: true,
+          fillColor: Colors.white,
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (parcelas.isEmpty) {
@@ -208,117 +289,193 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
     final parcela = parcelas[currentIndex];
     final String fechaActual = DateFormat('yyyy-MM-dd').format(DateTime.now());
-
-    final totalRaices = registros.fold<int>(
-      0,
-      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
-    );
-    final totalPeso = registros.fold<double>(
-      0.0,
-      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
-    );
+    final totalRaices = registros.fold<int>(0, (sum, r) => sum + (r['cantidad'] as int? ?? 0));
+    final totalPeso = registros.fold<double>(0.0, (sum, r) => sum + (r['peso'] as double? ?? 0.0));
 
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
-        title: Text("Parcela ${parcela['numero']} - Bloque ${widget.bloqueId}"),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        backgroundColor: Colors.black,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text("📅 Fecha: $fechaActual"),
-            Text("🧾 N° Ficha: ${widget.numeroFicha}"),
-            Text("🧪 N° Tratamiento: ${widget.numeroTratamiento}"),
-            const SizedBox(height: 16),
-            Text(
-              "Tratamiento de raíces (Parcela ${currentIndex + 1} de ${parcelas.length})",
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 10),
-            TextField(
-              controller: raicesController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Cantidad de raíces",
-              ),
-            ),
-            TextField(
-              controller: pesoRaicesController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(labelText: "Peso raíces (kg)"),
-            ),
-            TextField(
-              controller: pesoHojasController,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(labelText: "Peso hojas (kg)"),
-            ),
-            TextField(
-              controller: ndviController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: "NDVI"),
-            ),
-            TextField(
-              controller: observacionesController,
-              decoration: const InputDecoration(labelText: "Observaciones"),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 10),
-            ElevatedButton.icon(
-              onPressed: agregarRegistro,
-              icon: const Icon(Icons.add),
-              label: const Text("Agregar tratamiento"),
-            ),
-            const SizedBox(height: 16),
             Expanded(
-              child:
-                  registros.isEmpty
-                      ? const Center(child: Text("No hay datos aún."))
-                      : ListView.builder(
-                        itemCount: registros.length,
-                        itemBuilder: (context, index) {
-                          final r = registros[index];
-                          return ListTile(
-                            title: Text(r['nombre'] ?? 'Desconocido'),
-                            subtitle: Text(
-                              "Raíces: ${r['cantidad']} | Peso: ${r['peso']} kg",
-                            ),
-                          );
-                        },
-                      ),
+              child: Text(
+                "Parcela ${parcela['numero']} - Bloque ${widget.bloqueId}",
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const Divider(),
-            Text("Total raíces: $totalRaices"),
-            Text("Total peso raíces: ${totalPeso.toStringAsFixed(2)} kg"),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                ElevatedButton.icon(
-                  onPressed: irAEvaluacionDano,
-                  icon: const Icon(Icons.analytics),
-                  label: const Text("QUINLEI"),
-                ),
-                ElevatedButton.icon(
-                  onPressed: guardarTratamiento,
-                  icon: const Icon(Icons.save),
-                  label: const Text("Guardar"),
-                ),
+                Text("Ciudad: ${ciudadNombre ?? '...'}", style: const TextStyle(fontSize: 20, color: Colors.white70)),
+                Text("Serie: ${serieNombre ?? '...'}", style: const TextStyle(fontSize: 20, color: Colors.white70)),
               ],
             ),
-            const SizedBox(height: 10),
-            if (mensaje.isNotEmpty)
+          ],
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(24.0),
+        child: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text("📅 Fecha: $fechaActual", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text("🧾", style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 8),
+                          Text("N° Ficha: ${widget.numeroFicha}", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          const Text("🧪", style: TextStyle(fontSize: 20)),
+                          const SizedBox(width: 8),
+                          Text("N° Tratamiento: ${widget.numeroTratamiento}", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
               Text(
-                mensaje,
-                style: TextStyle(
-                  color: mensaje.startsWith("✅") ? Colors.green : Colors.red,
+                "Tratamiento de raíces (Parcela ${currentIndex + 1} de ${parcelas.length})",
+                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 20,
+                runSpacing: 20,
+                children: [
+                  _buildInput("Cantidad de raíces", raicesController),
+                  _buildInput("Peso raíces (kg)", pesoRaicesController),
+                  _buildInput("Peso hojas (kg)", pesoHojasController),
+                  _buildInput("NDVI", ndviController),
+                  _buildInput("Observaciones", observacionesController, maxLines: 2),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: agregarRegistro,
+                  icon: const Icon(Icons.add, size: 28, color: Colors.black),
+                  label: const Text("Agregar tratamiento", style: TextStyle(fontSize: 18, color: Colors.black)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                  ),
                 ),
               ),
-          ],
+              const SizedBox(height: 20),
+              registros.isEmpty
+                  ? const Center(child: Text("No hay datos aún.", style: TextStyle(fontSize: 18, color: Colors.white)))
+                  : Column(
+                      children: registros.map((r) {
+                        return Card(
+                          color: Colors.white,
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          child: ListTile(
+                            title: const Text("Nuevo registro", style: TextStyle(fontSize: 18, color: Colors.black)),
+                            subtitle: Text("Raíces: ${r['cantidad']} | Peso: ${r['peso']} kg", style: const TextStyle(fontSize: 16, color: Colors.black)),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text("Total raíces: $totalRaices", style: const TextStyle(fontSize: 18, color: Colors.black)),
+                    Text("Total peso raíces: ${totalPeso.toStringAsFixed(2)} kg", style: const TextStyle(fontSize: 18, color: Colors.black)),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: irAEvaluacionDano,
+                    icon: const Icon(Icons.analytics, color: Colors.black),
+                    label: const Text("QUINLEI", style: TextStyle(color: Colors.black)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: guardarTratamiento,
+                    icon: const Icon(Icons.save, color: Colors.black),
+                    label: const Text("Guardar", style: TextStyle(color: Colors.black)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton.icon(
+                    onPressed: reiniciarTratamiento,
+                    icon: const Icon(Icons.refresh),
+                    label: const Text("Reiniciar"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade600,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                  ElevatedButton.icon(
+                    onPressed: confirmarYSiguiente,
+                    icon: const Icon(Icons.navigate_next),
+                    label: const Text("Siguiente"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade800,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (mensaje.isNotEmpty)
+                Center(
+                  child: Text(
+                    mensaje,
+                    style: TextStyle(
+                      fontSize: 16,
+                      color: mensaje.startsWith("✅") ? Colors.green : Colors.red,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
