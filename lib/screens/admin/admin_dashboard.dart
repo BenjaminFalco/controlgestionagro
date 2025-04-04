@@ -63,7 +63,7 @@ class AdminDashboard extends StatelessWidget {
                 ),
                 _buildCompactButton(
                   context,
-                  "Gráfico Frecuencia",
+                  "Panel de datos",
                   Icons.bar_chart,
                   () => Navigator.push(
                     context,

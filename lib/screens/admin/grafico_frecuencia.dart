@@ -419,44 +419,49 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                       ],
                     ),
                     const SizedBox(height: 20),
-                    SizedBox(
-                      height: 250,
-                      child: BarChart(
-                        BarChartData(
-                          barGroups:
-                              frecuenciaNotas.entries.map((entry) {
-                                return BarChartGroupData(
-                                  x: entry.key,
-                                  barRods: [
-                                    BarChartRodData(
-                                      toY: entry.value.toDouble(),
-                                      width: 16,
-                                      color: Colors.teal,
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                  ],
-                                );
-                              }).toList(),
-                          titlesData: FlTitlesData(
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                getTitlesWidget:
-                                    (value, _) => Text("${value.toInt()}"),
+                    Center(
+                      child: SizedBox(
+                        width:
+                            MediaQuery.of(context).size.width *
+                            0.5, // mitad del ancho
+                        height: 250,
+                        child: BarChart(
+                          BarChartData(
+                            barGroups:
+                                frecuenciaNotas.entries.map((entry) {
+                                  return BarChartGroupData(
+                                    x: entry.key,
+                                    barRods: [
+                                      BarChartRodData(
+                                        toY: entry.value.toDouble(),
+                                        width: 16,
+                                        color: Colors.teal,
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                    ],
+                                  );
+                                }).toList(),
+                            titlesData: FlTitlesData(
+                              bottomTitles: AxisTitles(
+                                sideTitles: SideTitles(
+                                  showTitles: true,
+                                  getTitlesWidget:
+                                      (value, _) => Text("${value.toInt()}"),
+                                ),
+                              ),
+                              leftTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: true),
+                              ),
+                              rightTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
+                              ),
+                              topTitles: AxisTitles(
+                                sideTitles: SideTitles(showTitles: false),
                               ),
                             ),
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: true),
-                            ),
-                            rightTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
-                            topTitles: AxisTitles(
-                              sideTitles: SideTitles(showTitles: false),
-                            ),
+                            borderData: FlBorderData(show: false),
+                            gridData: FlGridData(show: true),
                           ),
-                          borderData: FlBorderData(show: false),
-                          gridData: FlGridData(show: true),
                         ),
                       ),
                     ),
@@ -470,27 +475,9 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                           backgroundColor: Colors.green.shade600,
                           foregroundColor: Colors.white,
                         ),
-                        onPressed: exportarCSV,
-                        icon: const Icon(Icons.download),
-                        label: const Text("Exportar CSV"),
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
-                          foregroundColor: Colors.white,
-                        ),
                         onPressed: exportarExcel,
                         icon: const Icon(Icons.table_chart),
                         label: const Text("Exportar Excel"),
-                      ),
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green.shade600,
-                          foregroundColor: Colors.white,
-                        ),
-                        onPressed: exportarPDF,
-                        icon: const Icon(Icons.picture_as_pdf),
-                        label: const Text("Exportar PDF"),
                       ),
                     ],
                   ),

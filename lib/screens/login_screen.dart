@@ -261,6 +261,8 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                 ),
               ),
+              const SizedBox(height: 20),
+
               ElevatedButton.icon(
                 onPressed: () async {
                   try {
@@ -299,6 +301,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     print("❌ Error al iniciar sesión anónima: $e");
                   }
                 },
+
                 icon: const Icon(Icons.play_arrow),
                 label: const Text("Iniciar", style: TextStyle(fontSize: 22)),
                 style: ElevatedButton.styleFrom(
