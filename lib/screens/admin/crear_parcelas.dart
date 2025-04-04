@@ -13,6 +13,8 @@ class CrearParcelas extends StatefulWidget {
 class _CrearParcelasState extends State<CrearParcelas> {
   String? ciudadSeleccionada;
   String? serieSeleccionada;
+  int cantidadParcelas = 0;
+  int cantidadBloques = 0;
 
   Map<String, List<DocumentSnapshot>> parcelasPorBloque = {};
   bool cargandoParcelas = false;
@@ -21,14 +23,14 @@ class _CrearParcelasState extends State<CrearParcelas> {
 
   String mensaje = '';
 
-  @override
   void initState() {
     super.initState();
     cargarCiudades();
   }
 
   Future<void> cargarCiudades() async {
-    final snapshot = await FirebaseFirestore.instance.collection('ciudades').get();
+    final snapshot =
+        await FirebaseFirestore.instance.collection('ciudades').get();
     setState(() {
       ciudades = snapshot.docs;
     });
@@ -36,11 +38,12 @@ class _CrearParcelasState extends State<CrearParcelas> {
 
   Future<void> cargarSeries() async {
     if (ciudadSeleccionada == null) return;
-    final snapshot = await FirebaseFirestore.instance
-        .collection('ciudades')
-        .doc(ciudadSeleccionada)
-        .collection('series')
-        .get();
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada)
+            .collection('series')
+            .get();
     setState(() {
       series = snapshot.docs;
     });
@@ -60,21 +63,17 @@ class _CrearParcelasState extends State<CrearParcelas> {
         .collection('series')
         .doc(serieSeleccionada!);
 
-    final serieDoc = await serieRef.get();
-    final int cantidadBloques = serieDoc['matriz_alto'];
+    final bloquesSnapshot = await serieRef.collection('bloques').get();
 
-    for (int i = 0; i < cantidadBloques; i++) {
-      String bloque = (cantidadBloques - i).toString();
-      final snap = await serieRef
-          .collection('bloques')
-          .doc(bloque)
-          .collection('parcelas')
-          .orderBy('numero')
-          .get();
+    for (final bloqueDoc in bloquesSnapshot.docs) {
+      final String bloque = bloqueDoc.id;
+      final parcelasSnap =
+          await bloqueDoc.reference
+              .collection('parcelas')
+              .orderBy('numero')
+              .get();
 
-      if (snap.docs.isNotEmpty) {
-        parcelasPorBloque[bloque] = snap.docs;
-      }
+      parcelasPorBloque[bloque] = parcelasSnap.docs;
     }
 
     setState(() => cargandoParcelas = false);
@@ -87,20 +86,24 @@ class _CrearParcelasState extends State<CrearParcelas> {
     }
 
     if (parcelasPorBloque.isNotEmpty) {
-      setState(() => mensaje = "⚠️ Ya existen parcelas. No puedes volver a crear.");
+      setState(
+        () => mensaje = "⚠️ Ya existen parcelas. No puedes volver a crear.",
+      );
       return;
     }
 
     try {
-      final serieDoc = await FirebaseFirestore.instance
-          .collection('ciudades')
-          .doc(ciudadSeleccionada!)
-          .collection('series')
-          .doc(serieSeleccionada!)
-          .get();
+      final serieDoc =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadSeleccionada!)
+              .collection('series')
+              .doc(serieSeleccionada!)
+              .get();
 
-      final int cantidadParcelas = serieDoc['matriz_largo'];
-      final int cantidadBloques = serieDoc['matriz_alto'];
+      cantidadParcelas = serieDoc['matriz_largo'];
+      cantidadBloques = serieDoc['matriz_alto'];
+
       final serieRef = FirebaseFirestore.instance
           .collection('ciudades')
           .doc(ciudadSeleccionada!)
@@ -108,9 +111,13 @@ class _CrearParcelasState extends State<CrearParcelas> {
           .doc(serieSeleccionada!);
 
       for (int i = 0; i < cantidadBloques; i++) {
-        String bloque = (i + 1).toString();
+        String bloque = String.fromCharCode(65 + i); // A, B, C...
         final bloqueRef = serieRef.collection('bloques').doc(bloque);
-        await bloqueRef.set({"nombre": bloque}, SetOptions(merge: true));
+        final bloqueSnap = await bloqueRef.get();
+
+        if (!bloqueSnap.exists) {
+          await bloqueRef.set({"nombre": bloque}, SetOptions(merge: true));
+        }
 
         for (int j = 1; j <= cantidadParcelas; j++) {
           final parcelaRef = bloqueRef.collection('parcelas').doc(j.toString());
@@ -119,6 +126,8 @@ class _CrearParcelasState extends State<CrearParcelas> {
           if (!parcelaSnap.exists) {
             await parcelaRef.set({
               "numero": j,
+              "numero_ficha": null,
+              "numero_tratamiento": null,
               "tratamiento": true,
               "trabajador_id": null,
               "total_raices": null,
@@ -142,7 +151,10 @@ class _CrearParcelasState extends State<CrearParcelas> {
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: const Color(0xFF005A56),
-        title: const Text("Crear Parcelas en Serie", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Crear Parcelas en Serie",
+          style: TextStyle(color: Colors.white),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: SingleChildScrollView(
@@ -153,9 +165,13 @@ class _CrearParcelasState extends State<CrearParcelas> {
             DropdownButtonFormField<String>(
               value: ciudadSeleccionada,
               decoration: _dropdownDecoration("Seleccionar ciudad"),
-              items: ciudades.map((doc) {
-                return DropdownMenuItem(value: doc.id, child: Text(doc['nombre']));
-              }).toList(),
+              items:
+                  ciudades.map((doc) {
+                    return DropdownMenuItem(
+                      value: doc.id,
+                      child: Text(doc['nombre']),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 setState(() {
                   ciudadSeleccionada = value;
@@ -170,9 +186,13 @@ class _CrearParcelasState extends State<CrearParcelas> {
             DropdownButtonFormField<String>(
               value: serieSeleccionada,
               decoration: _dropdownDecoration("Seleccionar serie"),
-              items: series.map((doc) {
-                return DropdownMenuItem(value: doc.id, child: Text(doc['nombre']));
-              }).toList(),
+              items:
+                  series.map((doc) {
+                    return DropdownMenuItem(
+                      value: doc.id,
+                      child: Text(doc['nombre']),
+                    );
+                  }).toList(),
               onChanged: (value) {
                 setState(() => serieSeleccionada = value);
                 cargarMatrizCompleta();
@@ -194,66 +214,119 @@ class _CrearParcelasState extends State<CrearParcelas> {
               mensaje,
               style: TextStyle(
                 fontSize: 16,
-                color: mensaje.startsWith("✅")
-                    ? Colors.green
-                    : mensaje.startsWith("⚠️")
+                color:
+                    mensaje.startsWith("✅")
+                        ? Colors.green
+                        : mensaje.startsWith("⚠️")
                         ? Colors.orange
                         : Colors.red,
               ),
             ),
             const SizedBox(height: 20),
             if (parcelasPorBloque.isNotEmpty)
-              ...parcelasPorBloque.entries.toList().reversed
-  .map((entry) {
+              ...parcelasPorBloque.entries
+                  .toList()
+                  .reversed
+                  .map((entry) {
                     final bloque = entry.key;
                     final List<DocumentSnapshot> listaParcelas = entry.value;
 
                     return Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text("Bloque $bloque", style: const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          "BLOQUE $bloque",
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                         const SizedBox(height: 6),
                         SizedBox(
-                          height: 100,
+                          height: 160,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: listaParcelas.length,
                             itemBuilder: (context, index) {
                               final parcela = listaParcelas[index];
-                              final numero = parcela['numero'];
                               final idDoc = parcela.id;
+
+                              // Usamos `data()` en vez de acceso directo para evitar errores con campos inexistentes
+                              final data =
+                                  parcela.data() as Map<String, dynamic>? ?? {};
+
+                              final numeroFicha =
+                                  data.containsKey('numero_ficha') &&
+                                          data['numero_ficha'] != null
+                                      ? data['numero_ficha'].toString().padLeft(
+                                        4,
+                                        '0',
+                                      )
+                                      : "-";
+
+                              final numeroTratamiento =
+                                  data.containsKey('numero_tratamiento') &&
+                                          data['numero_tratamiento'] != null
+                                      ? data['numero_tratamiento'].toString()
+                                      : "-";
 
                               return Container(
                                 width: 90,
-                                margin: const EdgeInsets.symmetric(horizontal: 4),
+                                margin: const EdgeInsets.symmetric(
+                                  horizontal: 4,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: Colors.deepPurple[50],
-                                  border: Border.all(color: Colors.deepPurple),
+                                  color: Colors.green[100],
+                                  border: Border.all(
+                                    color: Colors.green.shade800,
+                                  ),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Column(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
-                                    Text("Parcela $numero"),
+                                    Text(
+                                      numeroTratamiento,
+                                      style: const TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      numeroFicha,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
                                     const SizedBox(height: 6),
                                     ElevatedButton(
                                       onPressed: () {
                                         Navigator.push(
                                           context,
                                           MaterialPageRoute(
-                                            builder: (_) => EditarParcela(
-                                              ciudadId: ciudadSeleccionada!,
-                                              serieId: serieSeleccionada!,
-                                              bloqueId: bloque,
-                                              parcelaId: idDoc,
-                                            ),
+                                            builder:
+                                                (_) => EditarParcela(
+                                                  ciudadId: ciudadSeleccionada!,
+                                                  serieId: serieSeleccionada!,
+                                                  bloqueId: bloque,
+                                                  parcelaId: idDoc,
+                                                ),
                                           ),
                                         ).then((_) => cargarMatrizCompleta());
                                       },
                                       style: ElevatedButton.styleFrom(
-                                        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
                                       ),
-                                      child: const Text("Editar", style: TextStyle(fontSize: 11)),
+                                      child: const Text(
+                                        "Editar",
+                                        style: TextStyle(fontSize: 11),
+                                      ),
                                     ),
                                   ],
                                 ),

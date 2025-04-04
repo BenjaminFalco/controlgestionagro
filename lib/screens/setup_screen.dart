@@ -27,17 +27,18 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> _loadUserData() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
-      DocumentSnapshot userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(uid)
-          .get();
+      DocumentSnapshot userDoc =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(uid)
+              .get();
 
       if (userDoc.exists) {
         Map<String, dynamic> userData = userDoc.data() as Map<String, dynamic>;
 
         setState(() {
           nameController.text = userData['nombre'] ?? '';
-          phoneController.text = userData['telefono'] ?? '';
+
           selectedRole = userData['rol'] ?? 'trabajador';
         });
       }
@@ -52,7 +53,6 @@ class _SetupScreenState extends State<SetupScreen> {
 
       await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
         "nombre": nameController.text.trim(),
-        "telefono": phoneController.text.trim(),
         "rol": selectedRole,
       }, SetOptions(merge: true));
 
@@ -85,10 +85,7 @@ class _SetupScreenState extends State<SetupScreen> {
         backgroundColor: const Color(0xFF005A56), // Azul petróleo IANSA
         centerTitle: true,
         elevation: 0,
-        title: Image.asset(
-          'assets/images/iansa_logo.jpeg',
-          height: 40,
-        ),
+        title: Image.asset('assets/images/iansa_logo.jpeg', height: 40),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -110,17 +107,8 @@ class _SetupScreenState extends State<SetupScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  _buildTextField(
-                    controller: nameController,
-                    label: "Nombre",
-                  ),
-                  const SizedBox(height: 16),
+                  _buildTextField(controller: nameController, label: "Nombre"),
 
-                  _buildTextField(
-                    controller: phoneController,
-                    label: "Teléfono",
-                    keyboardType: TextInputType.phone,
-                  ),
                   const SizedBox(height: 16),
 
                   _buildDropdown(),
@@ -128,7 +116,10 @@ class _SetupScreenState extends State<SetupScreen> {
                   const SizedBox(height: 20),
 
                   if (errorMessage.isNotEmpty)
-                    Text(errorMessage, style: const TextStyle(color: Colors.red)),
+                    Text(
+                      errorMessage,
+                      style: const TextStyle(color: Colors.red),
+                    ),
                   const SizedBox(height: 20),
 
                   ElevatedButton(
@@ -136,7 +127,10 @@ class _SetupScreenState extends State<SetupScreen> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFF00B140), // Verde IANSA
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 35, vertical: 20),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 35,
+                        vertical: 20,
+                      ),
                       textStyle: const TextStyle(fontSize: 20),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
@@ -186,7 +180,10 @@ class _SetupScreenState extends State<SetupScreen> {
         labelStyle: const TextStyle(color: Colors.black87, fontSize: 18),
         filled: true,
         fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+        contentPadding: const EdgeInsets.symmetric(
+          vertical: 20,
+          horizontal: 16,
+        ),
         border: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.black),
           borderRadius: BorderRadius.circular(8),
@@ -223,12 +220,10 @@ class _SetupScreenState extends State<SetupScreen> {
             selectedRole = newValue!;
           });
         },
-        items: ['trabajador', 'admin'].map((String value) {
-          return DropdownMenuItem<String>(
-            value: value,
-            child: Text(value),
-          );
-        }).toList(),
+        items:
+            ['trabajador', 'admin'].map((String value) {
+              return DropdownMenuItem<String>(value: value, child: Text(value));
+            }).toList(),
       ),
     );
   }

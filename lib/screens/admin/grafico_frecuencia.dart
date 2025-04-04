@@ -204,6 +204,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             ),
       ),
     );
+
     final dir = await getApplicationDocumentsDirectory();
     final path = "${dir.path}/frecuencia_export.pdf";
     final file = File(path);
@@ -228,33 +229,37 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 
   @override
   Widget _buildDropdown<T>(
-  String label,
-  T? value,
-  List<DropdownMenuItem<T>> items,
-  void Function(T?) onChanged,
-) {
-  return DropdownButtonFormField<T>(
-    value: value,
-    decoration: InputDecoration(
-      labelText: label,
-      labelStyle: const TextStyle(
-        color: Colors.black, // <-- aquí el color del texto
-        fontWeight: FontWeight.w500,
+    String label,
+    T? value,
+    List<DropdownMenuItem<T>> items,
+    void Function(T?) onChanged,
+  ) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(
+          color: Colors.black, // <-- aquí el color del texto
+          fontWeight: FontWeight.w500,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: Colors.black),
+        ),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 12,
+        ),
       ),
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Colors.black),
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-    ),
-    iconEnabledColor: Colors.black,
-    dropdownColor: Colors.white,
-    style: const TextStyle(color: Colors.black),
-    items: items,
-    onChanged: onChanged,
-  );
-}
+      iconEnabledColor: Colors.black,
+      dropdownColor: Colors.white,
+      style: const TextStyle(color: Colors.black),
+      items: items,
+      onChanged: onChanged,
+    );
+  }
 
+  @override
   Widget build(BuildContext context) {
     double promedio =
         datosParcela.isEmpty
@@ -271,151 +276,231 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             : datosParcela.map((e) => e.valor).reduce((a, b) => a < b ? a : b);
 
     return Scaffold(
-  backgroundColor: Colors.white,
-  appBar: AppBar(
-    title: const Text("Gráfico Frecuencia Absoluta"),
-    backgroundColor: Colors.green.shade700,
-    foregroundColor: Colors.white,
-  ),
-  body: Padding(
-    padding: const EdgeInsets.all(16.0),
-    child: Column(
-      children: [
-        _buildDropdown("Ciudad", ciudadSeleccionada, ciudades.map((doc) {
-          return DropdownMenuItem(value: doc.id, child: Text(doc['nombre']));
-        }).toList(), (value) {
-          setState(() {
-            ciudadSeleccionada = value;
-            serieSeleccionada = null;
-            bloqueSeleccionado = null;
-            datosParcela = [];
-            parcelaSeleccionada = null;
-          });
-          cargarSeries();
-        }),
-        const SizedBox(height: 10),
-        _buildDropdown("Serie", serieSeleccionada, series.map((doc) {
-          return DropdownMenuItem(value: doc.id, child: Text(doc['nombre']));
-        }).toList(), (value) {
-          setState(() {
-            serieSeleccionada = value;
-            bloqueSeleccionado = null;
-            parcelaSeleccionada = null;
-            datosParcela = [];
-          });
-          cargarBloques();
-        }),
-        const SizedBox(height: 10),
-        _buildDropdown("Bloque (opcional)", bloqueSeleccionado, bloques.map((b) {
-          return DropdownMenuItem(value: b.id, child: Text("Bloque ${b.id}"));
-        }).toList(), (value) {
-          setState(() {
-            bloqueSeleccionado = value;
-            parcelaSeleccionada = null;
-          });
-          cargarFrecuencias();
-        }),
-        const SizedBox(height: 10),
-        _buildDropdown("Parcela (opcional)", parcelaSeleccionada, parcelasUnicas.map((n) {
-          return DropdownMenuItem(value: n, child: Text("Parcela $n"));
-        }).toList(), (value) {
-          setState(() {
-            parcelaSeleccionada = value;
-          });
-          cargarFrecuencias();
-        }),
-        const SizedBox(height: 20),
-        Expanded(
-          child: Column(
-            children: [
-              if (frecuenciaNotas.isEmpty)
-                  const Center(child: Text("No hay datos para mostrar."))
-                else
-                  SizedBox(
-                    height: 250,
-                    child: BarChart(
-                    BarChartData(
-                      barGroups: frecuenciaNotas.entries.map((entry) {
-                        return BarChartGroupData(
-                          x: entry.key,
-                          barRods: [
-                            BarChartRodData(
-                              toY: entry.value.toDouble(),
-                              width: 16,
-                              color: Colors.teal,
-                              borderRadius: BorderRadius.circular(4),
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text("Gráfico Frecuencia Absoluta"),
+        backgroundColor: Colors.green.shade700,
+        foregroundColor: Colors.white,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          children: [
+            _buildDropdown(
+              "Ciudad",
+              ciudadSeleccionada,
+              ciudades.map((doc) {
+                return DropdownMenuItem(
+                  value: doc.id,
+                  child: Text(doc['nombre']),
+                );
+              }).toList(),
+              (value) {
+                setState(() {
+                  ciudadSeleccionada = value;
+                  serieSeleccionada = null;
+                  bloqueSeleccionado = null;
+                  datosParcela = [];
+                  parcelaSeleccionada = null;
+                });
+                cargarSeries();
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildDropdown(
+              "Serie",
+              serieSeleccionada,
+              series.map((doc) {
+                return DropdownMenuItem(
+                  value: doc.id,
+                  child: Text(doc['nombre']),
+                );
+              }).toList(),
+              (value) {
+                setState(() {
+                  serieSeleccionada = value;
+                  bloqueSeleccionado = null;
+                  parcelaSeleccionada = null;
+                  datosParcela = [];
+                });
+                cargarBloques();
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildDropdown(
+              "Bloque (opcional)",
+              bloqueSeleccionado,
+              bloques.map((b) {
+                return DropdownMenuItem(
+                  value: b.id,
+                  child: Text("Bloque ${b.id}"),
+                );
+              }).toList(),
+              (value) {
+                setState(() {
+                  bloqueSeleccionado = value;
+                  parcelaSeleccionada = null;
+                });
+                cargarFrecuencias();
+              },
+            ),
+            const SizedBox(height: 10),
+            _buildDropdown(
+              "Parcela (opcional)",
+              parcelaSeleccionada,
+              parcelasUnicas.map((n) {
+                return DropdownMenuItem(value: n, child: Text("Parcela $n"));
+              }).toList(),
+              (value) {
+                setState(() {
+                  parcelaSeleccionada = value;
+                });
+                cargarFrecuencias();
+              },
+            ),
+            const SizedBox(height: 20),
+            Expanded(
+              child: Column(
+                children: [
+                  if (frecuenciaNotas.isEmpty)
+                    const Center(child: Text("No hay datos para mostrar."))
+                  else ...[
+                    Table(
+                      border: TableBorder.all(color: Colors.black),
+                      defaultVerticalAlignment:
+                          TableCellVerticalAlignment.middle,
+                      children: [
+                        TableRow(
+                          decoration: const BoxDecoration(
+                            color: Color(0xFFE0E0E0),
+                          ),
+                          children: [
+                            for (int i = 0; i <= 7; i++)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text(
+                                    "$i",
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Text(
+                                "Total",
+                                style: TextStyle(fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ],
-                        );
-                      }).toList(),
-                      titlesData: FlTitlesData(
-                        bottomTitles: AxisTitles(
-                          sideTitles: SideTitles(
-                            showTitles: true,
-                            getTitlesWidget: (value, _) => Text("${value.toInt()}"),
+                        ),
+                        TableRow(
+                          children: [
+                            for (int i = 0; i <= 7; i++)
+                              Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(8.0),
+                                  child: Text("${frecuenciaNotas[i] ?? 0}"),
+                                ),
+                              ),
+                            Padding(
+                              padding: const EdgeInsets.all(8.0),
+                              child: Text(
+                                "${frecuenciaNotas.values.reduce((a, b) => a + b)}",
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
+                    SizedBox(
+                      height: 250,
+                      child: BarChart(
+                        BarChartData(
+                          barGroups:
+                              frecuenciaNotas.entries.map((entry) {
+                                return BarChartGroupData(
+                                  x: entry.key,
+                                  barRods: [
+                                    BarChartRodData(
+                                      toY: entry.value.toDouble(),
+                                      width: 16,
+                                      color: Colors.teal,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ],
+                                );
+                              }).toList(),
+                          titlesData: FlTitlesData(
+                            bottomTitles: AxisTitles(
+                              sideTitles: SideTitles(
+                                showTitles: true,
+                                getTitlesWidget:
+                                    (value, _) => Text("${value.toInt()}"),
+                              ),
+                            ),
+                            leftTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: true),
+                            ),
+                            rightTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
+                            topTitles: AxisTitles(
+                              sideTitles: SideTitles(showTitles: false),
+                            ),
                           ),
-                        ),
-                        leftTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: true),
-                        ),
-                        rightTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
-                        ),
-                        topTitles: AxisTitles(
-                          sideTitles: SideTitles(showTitles: false),
+                          borderData: FlBorderData(show: false),
+                          gridData: FlGridData(show: true),
                         ),
                       ),
-                      borderData: FlBorderData(show: false),
-                      gridData: FlGridData(show: true),
                     ),
-                  ),
-                ),
-              const SizedBox(height: 16),
-              Text("📊 Estadísticas:", style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 6),
-              Text("• Promedio: ${promedio.toStringAsFixed(1)} raíces"),
-              Text("• Máximo: ${maximo.toStringAsFixed(0)}"),
-              Text("• Mínimo: ${minimo.toStringAsFixed(0)}"),
-              const SizedBox(height: 16),
-              Wrap(
-                spacing: 10,
-                children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: exportarCSV,
-                    icon: const Icon(Icons.download),
-                    label: const Text("Exportar CSV"),
-                  ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: exportarExcel,
-                    icon: const Icon(Icons.table_chart),
-                    label: const Text("Exportar Excel"),
-                  ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade600,
-                      foregroundColor: Colors.white,
-                    ),
-                    onPressed: exportarPDF,
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text("Exportar PDF"),
+                  ],
+                  const SizedBox(height: 16),
+                  Wrap(
+                    spacing: 10,
+                    children: [
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: exportarCSV,
+                        icon: const Icon(Icons.download),
+                        label: const Text("Exportar CSV"),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: exportarExcel,
+                        icon: const Icon(Icons.table_chart),
+                        label: const Text("Exportar Excel"),
+                      ),
+                      ElevatedButton.icon(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade600,
+                          foregroundColor: Colors.white,
+                        ),
+                        onPressed: exportarPDF,
+                        icon: const Icon(Icons.picture_as_pdf),
+                        label: const Text("Exportar PDF"),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
-          ),
+            ),
+          ],
         ),
-      ],
-    ),
-  ),
-);
+      ),
+    );
   }
 }
 
@@ -430,4 +515,3 @@ class _DatoParcela {
     required this.valor,
   });
 }
-

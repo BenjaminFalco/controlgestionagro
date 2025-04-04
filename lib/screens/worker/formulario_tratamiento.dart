@@ -50,26 +50,65 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     obtenerNombres();
   }
 
+  bool secuenciaInversa = true;
+
+  void cambiarSecuencia() {
+    setState(() {
+      secuenciaInversa = !secuenciaInversa;
+    });
+  }
+
+  void avanzarParcela() {
+    if (secuenciaInversa) {
+      // Derecha a izquierda (como está ahora)
+      if (currentIndex < parcelas.length - 1) {
+        setState(() {
+          currentIndex++;
+          registros.clear();
+          mensaje = '';
+        });
+      } else {
+        Navigator.pop(context);
+      }
+    } else {
+      // Izquierda a derecha
+      if (currentIndex > 0) {
+        setState(() {
+          currentIndex--;
+          registros.clear();
+          mensaje = '';
+        });
+      } else {
+        Navigator.pop(context);
+      }
+    }
+  }
+
   Future<void> cargarNombreTrabajador() async {
     final uid = FirebaseAuth.instance.currentUser!.uid;
-    final snapshot = await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
+    final snapshot =
+        await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
 
     setState(() {
-      nombreTrabajador = snapshot.data()?['nombre'] ?? FirebaseAuth.instance.currentUser?.email ?? 'Desconocido';
+      nombreTrabajador =
+          snapshot.data()?['nombre'] ??
+          FirebaseAuth.instance.currentUser?.email ??
+          'Desconocido';
     });
   }
 
   Future<void> cargarParcelasDesde() async {
-    final snapshot = await FirebaseFirestore.instance
-        .collection('ciudades')
-        .doc(widget.ciudadId)
-        .collection('series')
-        .doc(widget.serieId)
-        .collection('bloques')
-        .doc(widget.bloqueId)
-        .collection('parcelas')
-        .orderBy('numero')
-        .get();
+    final snapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .collection('bloques')
+            .doc(widget.bloqueId)
+            .collection('parcelas')
+            .orderBy('numero')
+            .get();
 
     final todas = snapshot.docs;
     final desde = todas.indexWhere((p) => p['numero'] == widget.parcelaDesde);
@@ -86,7 +125,9 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     final observaciones = observacionesController.text.trim();
 
     if (cantidad == null || peso == null || hojas == null || ndvi == null) {
-      setState(() => mensaje = "⚠️ Todos los campos numéricos deben ser válidos.");
+      setState(
+        () => mensaje = "⚠️ Todos los campos numéricos deben ser válidos.",
+      );
       return;
     }
 
@@ -111,13 +152,18 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
   Future<void> obtenerNombres() async {
     try {
-      final ciudadDoc = await FirebaseFirestore.instance.collection('ciudades').doc(widget.ciudadId).get();
-      final serieDoc = await FirebaseFirestore.instance
-          .collection('ciudades')
-          .doc(widget.ciudadId)
-          .collection('series')
-          .doc(widget.serieId)
-          .get();
+      final ciudadDoc =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(widget.ciudadId)
+              .get();
+      final serieDoc =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(widget.ciudadId)
+              .collection('series')
+              .doc(widget.serieId)
+              .get();
 
       setState(() {
         ciudadNombre = ciudadDoc.data()?['nombre'] ?? 'Ciudad';
@@ -135,7 +181,12 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     if (parcelas.isEmpty) return;
 
     final parcela = parcelas[currentIndex];
-    final snap = await parcela.reference.collection('tratamientos').orderBy('fecha', descending: true).limit(1).get();
+    final snap =
+        await parcela.reference
+            .collection('tratamientos')
+            .orderBy('fecha', descending: true)
+            .limit(1)
+            .get();
 
     if (snap.docs.isNotEmpty) {
       final data = snap.docs.first.data();
@@ -143,14 +194,20 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
       if (detalle != null) {
         setState(() {
-          registros = detalle
-              .whereType<Map<String, dynamic>>()
-              .map((r) => {
-                    'nombre': r['nombre'] ?? 'Desconocido',
-                    'cantidad': r['cantidad'] as int? ?? 0,
-                    'peso': r['peso'] is num ? (r['peso'] as num).toDouble() : 0.0,
-                  })
-              .toList();
+          registros =
+              detalle
+                  .whereType<Map<String, dynamic>>()
+                  .map(
+                    (r) => {
+                      'nombre': r['nombre'] ?? 'Desconocido',
+                      'cantidad': r['cantidad'] as int? ?? 0,
+                      'peso':
+                          r['peso'] is num
+                              ? (r['peso'] as num).toDouble()
+                              : 0.0,
+                    },
+                  )
+                  .toList();
         });
       }
     }
@@ -158,13 +215,20 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
   Future<void> guardarTratamiento() async {
     final parcela = parcelas[currentIndex];
-    final totalRaices = registros.fold<int>(0, (sum, r) => sum + (r['cantidad'] as int? ?? 0));
-    final totalPeso = registros.fold<double>(0.0, (sum, r) => sum + (r['peso'] as double? ?? 0.0));
+    final totalRaices = registros.fold<int>(
+      0,
+      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
+    );
+    final totalPeso = registros.fold<double>(
+      0.0,
+      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
+    );
 
     try {
       await parcela.reference.collection('tratamientos').add({
         "trabajador_id": FirebaseAuth.instance.currentUser?.uid,
-        "nombre": registros.isNotEmpty ? registros.last['nombre'] : 'Desconocido',
+        "nombre":
+            registros.isNotEmpty ? registros.last['nombre'] : 'Desconocido',
         "detalle": registros,
         "fecha": Timestamp.now(),
         "total_raices": totalRaices,
@@ -176,19 +240,14 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
         registros = [];
       });
 
-      if (currentIndex < parcelas.length - 1) {
-        setState(() {
-          currentIndex++;
-        });
-      } else {
-        Navigator.pop(context);
-      }
+      avanzarParcela();
     } catch (e) {
       setState(() {
         mensaje = "❌ Error al guardar: ${e.toString()}";
       });
     }
   }
+
   Future<void> reiniciarTratamiento() async {
     final parcela = parcelas[currentIndex];
     final snap = await parcela.reference.collection('tratamientos').get();
@@ -202,7 +261,8 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       mensaje = "⚠️ Tratamiento eliminado.";
     });
   }
-   void confirmarYSiguiente() {
+
+  void confirmarYSiguiente() {
     if (registros.isEmpty) {
       showDialog(
         context: context,
@@ -244,7 +304,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     }
   }
 
-    void irAEvaluacionDano() {
+  void irAEvaluacionDano() {
     final totalRaices = registros.fold<int>(
       0,
       (sum, r) => sum + (r['cantidad'] as int? ?? 0),
@@ -263,7 +323,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     );
   }
 
-  Widget _buildInput(String label, TextEditingController controller, {int maxLines = 1}) {
+  Widget _buildInput(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+  }) {
     return SizedBox(
       width: 300,
       child: TextField(
@@ -289,8 +353,14 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
     final parcela = parcelas[currentIndex];
     final String fechaActual = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final totalRaices = registros.fold<int>(0, (sum, r) => sum + (r['cantidad'] as int? ?? 0));
-    final totalPeso = registros.fold<double>(0.0, (sum, r) => sum + (r['peso'] as double? ?? 0.0));
+    final totalRaices = registros.fold<int>(
+      0,
+      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
+    );
+    final totalPeso = registros.fold<double>(
+      0.0,
+      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
+    );
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -316,8 +386,14 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
               crossAxisAlignment: CrossAxisAlignment.end,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text("Ciudad: ${ciudadNombre ?? '...'}", style: const TextStyle(fontSize: 20, color: Colors.white70)),
-                Text("Serie: ${serieNombre ?? '...'}", style: const TextStyle(fontSize: 20, color: Colors.white70)),
+                Text(
+                  "Ciudad: ${ciudadNombre ?? '...'}",
+                  style: const TextStyle(fontSize: 20, color: Colors.white70),
+                ),
+                Text(
+                  "Serie: ${serieNombre ?? '...'}",
+                  style: const TextStyle(fontSize: 20, color: Colors.white70),
+                ),
               ],
             ),
           ],
@@ -332,7 +408,10 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text("📅 Fecha: $fechaActual", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                  Text(
+                    "📅 Fecha: $fechaActual",
+                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                  ),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -340,7 +419,13 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                         children: [
                           const Text("🧾", style: TextStyle(fontSize: 20)),
                           const SizedBox(width: 8),
-                          Text("N° Ficha: ${widget.numeroFicha}", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                          Text(
+                            "N° Ficha: ${widget.numeroFicha}",
+                            style: const TextStyle(
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                       const SizedBox(height: 8),
@@ -348,7 +433,13 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                         children: [
                           const Text("🧪", style: TextStyle(fontSize: 20)),
                           const SizedBox(width: 8),
-                          Text("N° Tratamiento: ${widget.numeroTratamiento}", style: const TextStyle(fontSize: 20, color: Colors.white)),
+                          Text(
+                            "N° Tratamiento: ${widget.numeroTratamiento}",
+                            style: const TextStyle(
+                              fontSize: 20,
+                              color: Colors.white,
+                            ),
+                          ),
                         ],
                       ),
                     ],
@@ -358,7 +449,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
               const SizedBox(height: 20),
               Text(
                 "Tratamiento de raíces (Parcela ${currentIndex + 1} de ${parcelas.length})",
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
               ),
               const SizedBox(height: 20),
               Wrap(
@@ -369,7 +464,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                   _buildInput("Peso raíces (kg)", pesoRaicesController),
                   _buildInput("Peso hojas (kg)", pesoHojasController),
                   _buildInput("NDVI", ndviController),
-                  _buildInput("Observaciones", observacionesController, maxLines: 2),
+                  _buildInput(
+                    "Observaciones",
+                    observacionesController,
+                    maxLines: 2,
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
@@ -377,28 +476,52 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 child: ElevatedButton.icon(
                   onPressed: agregarRegistro,
                   icon: const Icon(Icons.add, size: 28, color: Colors.black),
-                  label: const Text("Agregar tratamiento", style: TextStyle(fontSize: 18, color: Colors.black)),
+                  label: const Text(
+                    "",
+                    style: TextStyle(fontSize: 18, color: Colors.black),
+                  ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 28,
+                      vertical: 16,
+                    ),
                   ),
                 ),
               ),
               const SizedBox(height: 20),
               registros.isEmpty
-                  ? const Center(child: Text("No hay datos aún.", style: TextStyle(fontSize: 18, color: Colors.white)))
-                  : Column(
-                      children: registros.map((r) {
-                        return Card(
-                          color: Colors.white,
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          child: ListTile(
-                            title: const Text("Nuevo registro", style: TextStyle(fontSize: 18, color: Colors.black)),
-                            subtitle: Text("Raíces: ${r['cantidad']} | Peso: ${r['peso']} kg", style: const TextStyle(fontSize: 16, color: Colors.black)),
-                          ),
-                        );
-                      }).toList(),
+                  ? const Center(
+                    child: Text(
+                      "No hay datos aún.",
+                      style: TextStyle(fontSize: 18, color: Colors.white),
                     ),
+                  )
+                  : Column(
+                    children:
+                        registros.map((r) {
+                          return Card(
+                            color: Colors.white,
+                            margin: const EdgeInsets.symmetric(vertical: 6),
+                            child: ListTile(
+                              title: const Text(
+                                "Nuevo registro",
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.black,
+                                ),
+                              ),
+                              subtitle: Text(
+                                "Raíces: ${r['cantidad']} | Peso: ${r['peso']} kg",
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  color: Colors.black,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                  ),
               const SizedBox(height: 20),
               Container(
                 width: double.infinity,
@@ -410,8 +533,14 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text("Total raíces: $totalRaices", style: const TextStyle(fontSize: 18, color: Colors.black)),
-                    Text("Total peso raíces: ${totalPeso.toStringAsFixed(2)} kg", style: const TextStyle(fontSize: 18, color: Colors.black)),
+                    Text(
+                      "Total raíces: $totalRaices",
+                      style: const TextStyle(fontSize: 18, color: Colors.black),
+                    ),
+                    Text(
+                      "Total peso raíces: ${totalPeso.toStringAsFixed(2)} kg",
+                      style: const TextStyle(fontSize: 18, color: Colors.black),
+                    ),
                   ],
                 ),
               ),
@@ -422,19 +551,31 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                   ElevatedButton.icon(
                     onPressed: irAEvaluacionDano,
                     icon: const Icon(Icons.analytics, color: Colors.black),
-                    label: const Text("QUINLEI", style: TextStyle(color: Colors.black)),
+                    label: const Text(
+                      "QUINLEI",
+                      style: TextStyle(color: Colors.black),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                     ),
                   ),
                   ElevatedButton.icon(
                     onPressed: guardarTratamiento,
                     icon: const Icon(Icons.save, color: Colors.black),
-                    label: const Text("Guardar", style: TextStyle(color: Colors.black)),
+                    label: const Text(
+                      "Guardar",
+                      style: TextStyle(color: Colors.black),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 16,
+                      ),
                     ),
                   ),
                 ],
@@ -453,12 +594,16 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     ),
                   ),
                   ElevatedButton.icon(
-                    onPressed: confirmarYSiguiente,
-                    icon: const Icon(Icons.navigate_next),
-                    label: const Text("Siguiente"),
+                    onPressed: cambiarSecuencia,
+                    icon: const Icon(Icons.swap_horiz),
+                    label: Text(
+                      secuenciaInversa
+                          ? "Secuencia: Derecha → Izquierda"
+                          : "Secuencia: Izquierda → Derecha",
+                      style: const TextStyle(color: Colors.black),
+                    ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue.shade800,
-                      foregroundColor: Colors.white,
+                      backgroundColor: Colors.white,
                     ),
                   ),
                 ],
@@ -470,7 +615,8 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     mensaje,
                     style: TextStyle(
                       fontSize: 16,
-                      color: mensaje.startsWith("✅") ? Colors.green : Colors.red,
+                      color:
+                          mensaje.startsWith("✅") ? Colors.green : Colors.red,
                     ),
                   ),
                 ),

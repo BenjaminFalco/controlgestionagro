@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import 'firebase_options.dart';
 import 'screens/loading_screen.dart';
 import 'screens/login_screen.dart';
+import 'package:controlgestionagro/screens/worker/inicio_tratamiento.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -61,7 +62,11 @@ class _MyAppState extends State<MyApp> {
           labelStyle: TextStyle(color: Colors.white70),
         ),
       ),
-      home: const AuthWrapper(),
+      initialRoute: '/',
+      routes: {
+        '/': (context) => const AuthWrapper(),
+        '/inicio_tratamiento': (context) => const InicioTratamientoScreen(),
+      },
     );
   }
 }

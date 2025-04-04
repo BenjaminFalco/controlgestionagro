@@ -48,17 +48,18 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       UserCredential userCredential = await FirebaseAuth.instance
           .signInWithEmailAndPassword(
-        email: emailController.text.trim(),
-        password: passwordController.text.trim(),
-      );
+            email: emailController.text.trim(),
+            password: passwordController.text.trim(),
+          );
 
       await _guardarUsuarioReciente(emailController.text.trim());
 
       final uid = userCredential.user!.uid;
-      final userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(uid)
+              .get();
       final userData = userDoc.data() as Map<String, dynamic>?;
 
       if (userData == null ||
@@ -99,16 +100,18 @@ class _LoginScreenState extends State<LoginScreen> {
         idToken: googleAuth.idToken,
       );
 
-      final userCredential =
-          await FirebaseAuth.instance.signInWithCredential(credential);
+      final userCredential = await FirebaseAuth.instance.signInWithCredential(
+        credential,
+      );
       final email = userCredential.user?.email ?? '';
       await _guardarUsuarioReciente(email);
 
       final uid = userCredential.user!.uid;
-      final userDoc = await FirebaseFirestore.instance
-          .collection('usuarios')
-          .doc(uid)
-          .get();
+      final userDoc =
+          await FirebaseFirestore.instance
+              .collection('usuarios')
+              .doc(uid)
+              .get();
 
       if (!userDoc.exists) {
         await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
@@ -149,7 +152,9 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> recuperarContrasena() async {
     final email = emailController.text.trim();
     if (email.isEmpty) {
-      setState(() => errorMessage = "Ingresa tu correo para recuperar la contraseña.");
+      setState(
+        () => errorMessage = "Ingresa tu correo para recuperar la contraseña.",
+      );
       return;
     }
 
@@ -169,10 +174,7 @@ class _LoginScreenState extends State<LoginScreen> {
         backgroundColor: const Color(0xFF005A56),
         centerTitle: true,
         elevation: 0,
-        title: Image.asset(
-          'assets/images/iansa_logo.jpeg',
-          height: 40,
-        ),
+        title: Image.asset('assets/images/iansa_logo.jpeg', height: 40),
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -195,12 +197,16 @@ class _LoginScreenState extends State<LoginScreen> {
                     const SizedBox(height: 8),
                     Wrap(
                       spacing: 10,
-                      children: usuariosRecientes.map((email) {
-                        return ActionChip(
-                          label: Text(email),
-                          onPressed: () => setState(() => emailController.text = email),
-                        );
-                      }).toList(),
+                      children:
+                          usuariosRecientes.map((email) {
+                            return ActionChip(
+                              label: Text(email),
+                              onPressed:
+                                  () => setState(
+                                    () => emailController.text = email,
+                                  ),
+                            );
+                          }).toList(),
                     ),
                     const SizedBox(height: 20),
                   ],
@@ -239,28 +245,77 @@ class _LoginScreenState extends State<LoginScreen> {
               ElevatedButton.icon(
                 onPressed: loginUser,
                 icon: const Icon(Icons.login, size: 28),
-                label: const Text("Iniciar sesión", style: TextStyle(fontSize: 22)),
+                label: const Text(
+                  "Iniciar sesión",
+                  style: TextStyle(fontSize: 22),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF00B140),
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
               ElevatedButton.icon(
-                onPressed: loginWithGoogle,
-                icon: const Icon(Icons.g_mobiledata, size: 28),
-                label: const Text("Iniciar con Google", style: TextStyle(fontSize: 22)),
+                onPressed: () async {
+                  try {
+                    UserCredential anonUser =
+                        await FirebaseAuth.instance.signInAnonymously();
+
+                    // Crea el documento del trabajador anónimo si no existe
+                    final uid = anonUser.user!.uid;
+                    final userDoc =
+                        await FirebaseFirestore.instance
+                            .collection('usuarios')
+                            .doc(uid)
+                            .get();
+
+                    if (!userDoc.exists) {
+                      await FirebaseFirestore.instance
+                          .collection('usuarios')
+                          .doc(uid)
+                          .set({
+                            'nombre': 'Trabajador Invitado',
+                            'rol': 'trabajador',
+                            'ciudad':
+                                'CiudadDemo', // ← reemplaza por ciudad real o pide selección
+                            'ensayos_asignados':
+                                [], // ← podrías llenar ensayos demo o reales aquí
+                          });
+                    }
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const WorkerDashboard(),
+                      ),
+                    );
+                  } catch (e) {
+                    print("❌ Error al iniciar sesión anónima: $e");
+                  }
+                },
+                icon: const Icon(Icons.play_arrow),
+                label: const Text("Iniciar", style: TextStyle(fontSize: 22)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-                  side: const BorderSide(color: Colors.black),
+                  backgroundColor: const Color(0xFF005A56),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
                 ),
               ),
+
+              const SizedBox(height: 16),
+
               const SizedBox(height: 16),
               TextButton(
                 onPressed: () {
@@ -297,7 +352,10 @@ class _LoginScreenState extends State<LoginScreen> {
           labelStyle: const TextStyle(color: Colors.black87, fontSize: 18),
           filled: true,
           fillColor: Colors.white,
-          contentPadding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(
+            vertical: 20,
+            horizontal: 16,
+          ),
           border: OutlineInputBorder(
             borderSide: const BorderSide(color: Colors.black),
             borderRadius: BorderRadius.circular(8),

@@ -70,7 +70,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
     });
 
     // 🔊 Feedback sonoro
-    await player.play(AssetSource('sounds/click.mp3'));
+    await player.play(AssetSource('sounds/beep.mp3'));
   }
 
   void borrarUltimo() {

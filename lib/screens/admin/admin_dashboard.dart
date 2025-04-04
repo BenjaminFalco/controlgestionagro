@@ -25,33 +25,56 @@ class AdminDashboard extends StatelessWidget {
           ),
         ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      body: Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Expanded(
-              child: GridView.count(
-                crossAxisCount: 2,
-                mainAxisSpacing: 20,
-                crossAxisSpacing: 20,
-                childAspectRatio: 1,
-                children: [
-                  _buildSquareButton(context, "Crear Ciudad", Icons.location_city, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CrearCiudad()));
-                  }),
-                  _buildSquareButton(context, "Crear Serie", Icons.map, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CrearSerie()));
-                  }),
-                  _buildSquareButton(context, "Crear Parcelas", Icons.grid_on, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const CrearParcelas()));
-                  }),
-                  _buildSquareButton(context, "Gráfico frecuencia", Icons.bar_chart, () {
-                    Navigator.push(context, MaterialPageRoute(builder: (_) => const GraficoFrecuencia()));
-                  }),
-                ],
-              ),
+            Wrap(
+              spacing: 16,
+              runSpacing: 16,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildCompactButton(
+                  context,
+                  "Crear Ciudad",
+                  Icons.location_city,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CrearCiudad()),
+                  ),
+                ),
+                _buildCompactButton(
+                  context,
+                  "Crear Serie",
+                  Icons.map,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CrearSerie()),
+                  ),
+                ),
+                _buildCompactButton(
+                  context,
+                  "Crear Parcelas",
+                  Icons.grid_on,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CrearParcelas()),
+                  ),
+                ),
+                _buildCompactButton(
+                  context,
+                  "Gráfico Frecuencia",
+                  Icons.bar_chart,
+                  () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const GraficoFrecuencia(),
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 30),
             ElevatedButton.icon(
               onPressed: () async {
                 await FirebaseAuth.instance.signOut();
@@ -61,10 +84,16 @@ class AdminDashboard extends StatelessWidget {
                 );
               },
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFFD700), // amarillo dorado
+                backgroundColor: const Color(0xFFFFD700),
                 foregroundColor: const Color(0xFF005A56),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                textStyle: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 14,
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -78,29 +107,34 @@ class AdminDashboard extends StatelessWidget {
     );
   }
 
-  Widget _buildSquareButton(BuildContext context, String label, IconData icon, VoidCallback onPressed) {
+  Widget _buildCompactButton(
+    BuildContext context,
+    String label,
+    IconData icon,
+    VoidCallback onPressed,
+  ) {
     return SizedBox(
-      width: 150,
-      height: 150,
+      width: 140,
+      height: 120,
       child: ElevatedButton(
         onPressed: onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: const Color(0xFF00B140),
           foregroundColor: Colors.white,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(16),
           ),
           elevation: 6,
         ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, size: 60),
-            const SizedBox(height: 14),
+            Icon(icon, size: 36),
+            const SizedBox(height: 10),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 16),
+              style: const TextStyle(fontSize: 14),
             ),
           ],
         ),
