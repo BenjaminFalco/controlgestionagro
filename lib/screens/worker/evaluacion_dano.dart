@@ -20,6 +20,9 @@ class EvaluacionDanoScreen extends StatefulWidget {
 class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   final AudioPlayer player = AudioPlayer();
   final TextEditingController cantidadController = TextEditingController();
+  int evaluadas = 0;
+  int faltan = 0;
+
   Map<int, int> evaluaciones = {}; // nota -> cantidad
   String mensaje = '';
 
@@ -46,9 +49,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
       ),
     );
   }
-
-  int get evaluadas => evaluaciones.values.fold(0, (a, b) => a + b);
-  int get faltan => widget.totalRaices - evaluadas;
 
   Future<void> agregarEvaluacion(int nota) async {
     final cantidad = int.tryParse(cantidadController.text.trim());
@@ -152,8 +152,11 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
   @override
   Widget build(BuildContext context) {
+    int totalRaices = evaluaciones.values.fold(0, (a, b) => a + b);
+    final bool completado = totalRaices >= widget.totalRaices;
+
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.white,
         title: const Text(
@@ -166,7 +169,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 "🔢 Daño evaluado: $evaluadas / ${widget.totalRaices}",
@@ -176,162 +178,101 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 "⏳ Faltan: $faltan raíces",
                 style: const TextStyle(color: Colors.white70, fontSize: 16),
               ),
-
-              const SizedBox(height: 16),
-
-              TextField(
-                controller: cantidadController,
-                readOnly: true,
-                style: const TextStyle(color: Colors.white, fontSize: 22),
-                decoration: InputDecoration(
-                  labelText: "Cantidad de raíces",
-                  labelStyle: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 18,
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[850],
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+              if (completado)
+                Padding(
+                  padding: const EdgeInsets.only(top: 12.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Text(
+                      "✅ Evaluación completa. No puedes ingresar más datos.",
+                      style: TextStyle(color: Colors.white, fontSize: 16),
+                    ),
                   ),
                 ),
-              ),
+              const SizedBox(height: 24),
 
-              const SizedBox(height: 32),
-
-              Wrap(
-                spacing: 16,
-                runSpacing: 16,
-                alignment: WrapAlignment.center,
-                children: List.generate(10, (index) {
-                  return SizedBox(
-                    width: 70,
-                    height: 70,
-                    child: ElevatedButton(
-                      onPressed: () {
-                        setState(() {
-                          cantidadController.text += index.toString();
-                        });
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.deepPurpleAccent,
-                        foregroundColor: Colors.white,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(14),
-                        ),
+              // Teclado categorías
+              GridView.count(
+                shrinkWrap: true,
+                crossAxisCount: 4,
+                mainAxisSpacing: 10,
+                crossAxisSpacing: 10,
+                childAspectRatio: 1,
+                physics: const NeverScrollableScrollPhysics(),
+                children: List.generate(8, (index) {
+                  final cantidad = evaluaciones[index] ?? 0;
+                  return GestureDetector(
+                    onTap:
+                        completado
+                            ? null
+                            : () {
+                              setState(() {
+                                evaluaciones[index] = cantidad + 1;
+                              });
+                            },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color:
+                            completado
+                                ? Colors.grey.shade800
+                                : const Color.fromARGB(255, 16, 80, 112),
+                        border: Border.all(color: Colors.white, width: 2),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(
-                        "$index",
-                        style: const TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.bold,
-                        ),
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 10,
+                        horizontal: 8,
+                      ),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        children: [
+                          Text(
+                            "$index",
+                            style: const TextStyle(
+                              fontSize: 24,
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          Text(
+                            "$cantidad",
+                            style: const TextStyle(
+                              fontSize: 18,
+                              color: Colors.white70,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   );
                 }),
               ),
 
-              const SizedBox(height: 12),
-
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      final texto = cantidadController.text;
-                      if (texto.isNotEmpty) {
-                        cantidadController.text = texto.substring(
-                          0,
-                          texto.length - 1,
-                        );
-                      }
-                    });
-                  },
-                  icon: const Icon(Icons.backspace),
-                  label: const Text(
-                    "Borrar dígito",
-                    style: TextStyle(fontSize: 18),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.redAccent,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              // Botones de nota
-              Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children:
-                        [
-                          7,
-                          6,
-                          5,
-                        ].map((nota) => _buildNotaButton(nota)).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children:
-                        [
-                          4,
-                          3,
-                          2,
-                        ].map((nota) => _buildNotaButton(nota)).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children:
-                        [1, 0].map((nota) => _buildNotaButton(nota)).toList(),
-                  ),
-                ],
-              ),
-
               const SizedBox(height: 20),
 
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  OutlinedButton.icon(
-                    onPressed: borrarUltimo,
-                    icon: const Icon(Icons.undo, color: Colors.red),
-                    label: const Text(
-                      "Borrar último",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
+              // Cuadro Total
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 12,
+                  horizontal: 20,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade900,
+                  border: Border.all(color: Colors.white, width: 2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  "$totalRaices Raíces",
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
                   ),
-                  OutlinedButton.icon(
-                    onPressed: reiniciarEvaluacion,
-                    icon: const Icon(Icons.restart_alt, color: Colors.white),
-                    label: const Text(
-                      "Reiniciar",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 12,
-                      ),
-                    ),
-                  ),
-                ],
+                ),
               ),
 
               const SizedBox(height: 24),
@@ -347,7 +288,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
               const SizedBox(height: 10),
 
-              // Frecuencia acumulada con barras
               if (evaluaciones.isNotEmpty)
                 Column(
                   children:
@@ -359,7 +299,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                             .toStringAsFixed(1);
 
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          padding: const EdgeInsets.symmetric(vertical: 8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -367,16 +307,15 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                                 "Nota $nota  •  $cantidad raíces  •  $porcentajeTexto%",
                                 style: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w500,
+                                  fontSize: 16,
                                 ),
                               ),
-                              const SizedBox(height: 6),
+                              const SizedBox(height: 4),
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(10),
                                 child: LinearProgressIndicator(
                                   value: porcentaje.clamp(0.0, 1.0),
-                                  minHeight: 14,
+                                  minHeight: 12,
                                   backgroundColor: Colors.white12,
                                   valueColor: AlwaysStoppedAnimation<Color>(
                                     Colors.lightGreenAccent.shade200,
@@ -397,18 +336,56 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   ),
                 ),
 
+              const SizedBox(height: 24),
+
+              // Botones
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  OutlinedButton.icon(
+                    onPressed: borrarUltimo,
+                    icon: const Icon(Icons.undo, color: Colors.red),
+                    label: const Text(
+                      "Borrar último",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                  OutlinedButton.icon(
+                    onPressed: reiniciarEvaluacion,
+                    icon: const Icon(Icons.restart_alt, color: Colors.white),
+                    label: const Text(
+                      "Reiniciar",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 10,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
               const SizedBox(height: 20),
 
-              // Guardar evaluación
               SizedBox(
                 width: double.infinity,
-                height: 60,
+                height: 50,
                 child: ElevatedButton.icon(
                   onPressed: guardarEvaluacion,
                   icon: const Icon(Icons.save),
                   label: const Text(
                     "Guardar evaluación",
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF04bc04),
