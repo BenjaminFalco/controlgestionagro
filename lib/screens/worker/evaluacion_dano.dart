@@ -151,6 +151,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   }
 
   @override
+  @override
   Widget build(BuildContext context) {
     int totalRaices = evaluaciones.values.fold(0, (a, b) => a + b);
     final bool completado = totalRaices >= widget.totalRaices;
@@ -195,13 +196,12 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 ),
               const SizedBox(height: 24),
 
-              // Teclado categorías
               GridView.count(
                 shrinkWrap: true,
                 crossAxisCount: 4,
                 mainAxisSpacing: 10,
                 crossAxisSpacing: 10,
-                childAspectRatio: 1,
+                childAspectRatio: 1.1,
                 physics: const NeverScrollableScrollPhysics(),
                 children: List.generate(8, (index) {
                   final cantidad = evaluaciones[index] ?? 0;
@@ -209,10 +209,11 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                     onTap:
                         completado
                             ? null
-                            : () {
+                            : () async {
                               setState(() {
                                 evaluaciones[index] = cantidad + 1;
                               });
+                              await player.play(AssetSource('sounds/beep.mp3'));
                             },
                     child: Container(
                       decoration: BoxDecoration(
@@ -223,26 +224,35 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                         border: Border.all(color: Colors.white, width: 2),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 10,
-                        horizontal: 8,
-                      ),
+                      padding: const EdgeInsets.all(8),
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceAround,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           Text(
                             "$index",
                             style: const TextStyle(
-                              fontSize: 24,
+                              fontSize: 26,
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          Text(
-                            "$cantidad",
-                            style: const TextStyle(
-                              fontSize: 18,
-                              color: Colors.white70,
+                          const SizedBox(height: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.yellow.shade700,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              "$cantidad",
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                         ],
@@ -254,7 +264,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
               const SizedBox(height: 20),
 
-              // Cuadro Total
               Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 12,
@@ -285,7 +294,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   fontSize: 20,
                 ),
               ),
-
               const SizedBox(height: 10),
 
               if (evaluaciones.isNotEmpty)
@@ -338,7 +346,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
               const SizedBox(height: 24),
 
-              // Botones
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [

@@ -180,7 +180,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           Expanded(
                             child: _buildFieldBox(
                               _buildDropdown(
-                                "Ciudad",
+                                "Localidad",
                                 ciudadSeleccionada,
                                 ciudades.map((doc) {
                                   return DropdownMenuItem(
@@ -213,7 +213,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           Expanded(
                             child: _buildFieldBox(
                               _buildDropdown(
-                                "Serie",
+                                "Ensayo",
                                 serieSeleccionada,
                                 series.map((doc) {
                                   return DropdownMenuItem(
