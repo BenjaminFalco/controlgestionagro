@@ -10,12 +10,19 @@ class CrearSerie extends StatefulWidget {
 
 class _CrearSerieState extends State<CrearSerie> {
   final TextEditingController nombreSerieController = TextEditingController();
-  final TextEditingController cantidadParcelasController = TextEditingController();
-  final TextEditingController cantidadBloquesController = TextEditingController();
+  final TextEditingController cantidadParcelasController =
+      TextEditingController();
+  final TextEditingController cantidadBloquesController =
+      TextEditingController();
 
   String mensaje = '';
   String? ciudadSeleccionada;
   List<QueryDocumentSnapshot> ciudades = [];
+
+  bool usarSerieExistente = false;
+  String? ciudadReferencia;
+  String? serieReferencia;
+  List<DocumentSnapshot> seriesReferenciaDisponibles = [];
 
   @override
   void initState() {
@@ -24,21 +31,116 @@ class _CrearSerieState extends State<CrearSerie> {
   }
 
   Future<void> cargarCiudades() async {
-    final snapshot = await FirebaseFirestore.instance.collection('ciudades').get();
+    final snapshot =
+        await FirebaseFirestore.instance.collection('ciudades').get();
     setState(() {
       ciudades = snapshot.docs;
     });
   }
 
+  Future<void> copiarNumeroTratamientoDesdeSerie(
+    String ciudadBaseId,
+    String serieBaseId,
+    DocumentReference nuevaSerieRef,
+  ) async {
+    final bloquesRef = FirebaseFirestore.instance
+        .collection('ciudades')
+        .doc(ciudadBaseId)
+        .collection('series')
+        .doc(serieBaseId)
+        .collection('bloques');
+
+    final nuevaRef = nuevaSerieRef.collection('bloques');
+
+    final bloquesSnapshot = await bloquesRef.get();
+    for (final bloqueDoc in bloquesSnapshot.docs) {
+      final parcelasSnap =
+          await bloqueDoc.reference
+              .collection('parcelas')
+              .orderBy('numero')
+              .get();
+
+      for (final parcelaDoc in parcelasSnap.docs) {
+        final data = parcelaDoc.data();
+        final numero = data['numero'];
+        final tratamiento = data['numero_tratamiento'];
+
+        final destinoSnap =
+            await nuevaRef
+                .doc(bloqueDoc.id)
+                .collection('parcelas')
+                .where('numero', isEqualTo: numero)
+                .get();
+
+        if (destinoSnap.docs.isNotEmpty && tratamiento != null) {
+          await destinoSnap.docs.first.reference.update({
+            'numero_tratamiento': tratamiento,
+          });
+        }
+      }
+    }
+  }
+
+  Future<void> copiarNumerosDesdeSerieReferencia(
+    String ciudadId,
+    String serieId,
+    DocumentReference nuevaSerieRef,
+  ) async {
+    final bloquesRef = FirebaseFirestore.instance
+        .collection('ciudades')
+        .doc(ciudadId)
+        .collection('series')
+        .doc(serieId)
+        .collection('bloques');
+
+    final nuevaRef = nuevaSerieRef.collection('bloques');
+
+    final bloquesSnapshot = await bloquesRef.get();
+    for (final bloqueDoc in bloquesSnapshot.docs) {
+      final parcelasSnap =
+          await bloqueDoc.reference
+              .collection('parcelas')
+              .orderBy('numero')
+              .get();
+
+      for (final parcelaDoc in parcelasSnap.docs) {
+        final data = parcelaDoc.data();
+        final numero = data['numero'];
+        final tratamiento = data['numero_tratamiento'];
+
+        final destino =
+            await nuevaRef
+                .doc(bloqueDoc.id)
+                .collection('parcelas')
+                .where('numero', isEqualTo: numero)
+                .get();
+
+        if (destino.docs.isNotEmpty) {
+          await destino.docs.first.reference.update({
+            'numero_tratamiento': tratamiento,
+          });
+        }
+      }
+    }
+  }
+
   Future<void> crearSerie() async {
     final nombreSerie = nombreSerieController.text.trim();
-    final cantidadParcelas = int.tryParse(cantidadParcelasController.text.trim());
+    final cantidadParcelas = int.tryParse(
+      cantidadParcelasController.text.trim(),
+    );
     final cantidadBloques = int.tryParse(cantidadBloquesController.text.trim());
 
-    if (nombreSerie.isEmpty ||
-        cantidadParcelas == null ||
-        cantidadBloques == null ||
-        ciudadSeleccionada == null) {
+    if (nombreSerie.isEmpty || ciudadSeleccionada == null) {
+      setState(() {
+        mensaje = '⚠️ Completa todos los campos.';
+      });
+      return;
+    }
+
+    // ⚠️ Solo validar bloques y parcelas si NO se usa serie existente
+    if (!usarSerieExistente &&
+        (cantidadParcelas == null || cantidadBloques == null)) {
       setState(() {
         mensaje = '⚠️ Completa todos los campos.';
       });
@@ -46,22 +148,43 @@ class _CrearSerieState extends State<CrearSerie> {
     }
 
     try {
-      final ciudadRef =
-          FirebaseFirestore.instance.collection('ciudades').doc(ciudadSeleccionada);
+      final ciudadRef = FirebaseFirestore.instance
+          .collection('ciudades')
+          .doc(ciudadSeleccionada);
 
+      int bloques = cantidadBloques ?? 0;
+      int parcelas = cantidadParcelas ?? 0;
+
+      // Si se basa en otra serie, obtener dimensiones desde esa serie
+      if (usarSerieExistente &&
+          ciudadReferencia != null &&
+          serieReferencia != null) {
+        final refBase = FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadReferencia)
+            .collection('series')
+            .doc(serieReferencia!);
+
+        final baseData = await refBase.get();
+        bloques = baseData.data()?['matriz_alto'] ?? 0;
+        parcelas = baseData.data()?['matriz_largo'] ?? 0;
+      }
+
+      // Crear la nueva serie
       final serieRef = await ciudadRef.collection('series').add({
         "nombre": nombreSerie,
-        "matriz_largo": cantidadParcelas,
-        "matriz_alto": cantidadBloques,
+        "matriz_largo": parcelas,
+        "matriz_alto": bloques,
         "fecha_creacion": FieldValue.serverTimestamp(),
       });
 
-      for (int i = 0; i < cantidadBloques; i++) {
-        String bloque = String.fromCharCode(65 + i); // A, B, C, D...
+      // 🔁 Crear bloques y parcelas
+      for (int i = 0; i < bloques; i++) {
+        String bloque = String.fromCharCode(65 + i); // A, B, C...
         final bloqueRef = serieRef.collection('bloques').doc(bloque);
         await bloqueRef.set({"nombre": bloque});
 
-        for (int j = 1; j <= cantidadParcelas; j++) {
+        for (int j = 1; j <= parcelas; j++) {
           await bloqueRef.collection('parcelas').add({
             "numero": j,
             "tratamiento": true,
@@ -73,9 +196,20 @@ class _CrearSerieState extends State<CrearSerie> {
         }
       }
 
+      // ✅ Copiar numero_tratamiento si corresponde
+      if (usarSerieExistente &&
+          ciudadReferencia != null &&
+          serieReferencia != null) {
+        await copiarNumeroTratamientoDesdeSerie(
+          ciudadReferencia!,
+          serieReferencia!,
+          serieRef,
+        );
+      }
+
       setState(() {
         mensaje =
-            "✅ Serie '$nombreSerie' creada con $cantidadBloques bloques y $cantidadParcelas parcelas por bloque.";
+            "✅ Serie '$nombreSerie' creada con $bloques bloques y $parcelas parcelas por bloque.";
         nombreSerieController.clear();
         cantidadParcelasController.clear();
         cantidadBloquesController.clear();
@@ -95,10 +229,7 @@ class _CrearSerieState extends State<CrearSerie> {
         backgroundColor: const Color(0xFF005A56),
         centerTitle: true,
         elevation: 0,
-        title: const Text(
-          "Crear Serie",
-          style: TextStyle(color: Colors.white),
-        ),
+        title: const Text("Crear Serie", style: TextStyle(color: Colors.white)),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
@@ -111,27 +242,16 @@ class _CrearSerieState extends State<CrearSerie> {
               children: [
                 DropdownButtonFormField<String>(
                   value: ciudadSeleccionada,
-                  onChanged: (value) => setState(() => ciudadSeleccionada = value),
-                  items: ciudades.map((doc) {
-                    return DropdownMenuItem<String>(
-                      value: doc.id,
-                      child: Text(doc['nombre']),
-                    );
-                  }).toList(),
-                  decoration: InputDecoration(
-                    labelText: "Seleccionar ciudad",
-                    labelStyle: const TextStyle(color: Colors.black),
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Colors.black),
-                    ),
-                    focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Color(0xFF005A56), width: 2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                  ),
+                  onChanged:
+                      (value) => setState(() => ciudadSeleccionada = value),
+                  items:
+                      ciudades.map((doc) {
+                        return DropdownMenuItem<String>(
+                          value: doc.id,
+                          child: Text(doc['nombre']),
+                        );
+                      }).toList(),
+                  decoration: _dropdownDecoration("Seleccionar ciudad"),
                   dropdownColor: Colors.white,
                 ),
                 const SizedBox(height: 16),
@@ -144,13 +264,87 @@ class _CrearSerieState extends State<CrearSerie> {
                   controller: cantidadBloquesController,
                   label: "Cantidad de bloques en la serie",
                   keyboardType: TextInputType.number,
+                  enabled: !usarSerieExistente,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: cantidadParcelasController,
                   label: "Cantidad de parcelas por bloque",
                   keyboardType: TextInputType.number,
+                  enabled: !usarSerieExistente,
                 ),
+
+                const SizedBox(height: 24),
+
+                // 🔄 Nuevo Switch
+                Row(
+                  children: [
+                    const Text(
+                      "¿Basar en otra serie?",
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    const Spacer(),
+                    Switch(
+                      value: usarSerieExistente,
+                      onChanged: (val) {
+                        setState(() {
+                          usarSerieExistente = val;
+                          ciudadReferencia = null;
+                          serieReferencia = null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+
+                if (usarSerieExistente) ...[
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: ciudadReferencia,
+                    onChanged: (val) async {
+                      setState(() {
+                        ciudadReferencia = val;
+                        serieReferencia = null;
+                        seriesReferenciaDisponibles = [];
+                      });
+
+                      if (val != null) {
+                        final snap =
+                            await FirebaseFirestore.instance
+                                .collection('ciudades')
+                                .doc(val)
+                                .collection('series')
+                                .get();
+
+                        setState(() {
+                          seriesReferenciaDisponibles = snap.docs;
+                        });
+                      }
+                    },
+                    items:
+                        ciudades.map((doc) {
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text(doc['nombre']),
+                          );
+                        }).toList(),
+                    decoration: _dropdownDecoration("Ciudad base"),
+                  ),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<String>(
+                    value: serieReferencia,
+                    onChanged: (val) => setState(() => serieReferencia = val),
+                    items:
+                        seriesReferenciaDisponibles.map((doc) {
+                          return DropdownMenuItem<String>(
+                            value: doc.id,
+                            child: Text(doc['nombre']),
+                          );
+                        }).toList(),
+                    decoration: _dropdownDecoration("Serie base"),
+                  ),
+                ],
+
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: crearSerie,
@@ -171,9 +365,10 @@ class _CrearSerieState extends State<CrearSerie> {
                     mensaje,
                     style: TextStyle(
                       fontSize: 16,
-                      color: mensaje.startsWith("✅")
-                          ? Colors.green
-                          : mensaje.startsWith("⚠️")
+                      color:
+                          mensaje.startsWith("✅")
+                              ? Colors.green
+                              : mensaje.startsWith("⚠️")
                               ? Colors.orange
                               : Colors.red,
                     ),
@@ -186,21 +381,43 @@ class _CrearSerieState extends State<CrearSerie> {
     );
   }
 
+  InputDecoration _dropdownDecoration(String label) {
+    return InputDecoration(
+      labelText: label,
+      labelStyle: const TextStyle(color: Colors.black),
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(8),
+        borderSide: const BorderSide(color: Colors.black),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderSide: const BorderSide(color: Color(0xFF005A56), width: 2),
+        borderRadius: BorderRadius.circular(8),
+      ),
+    );
+  }
+
   Widget _buildTextField({
     required TextEditingController controller,
     required String label,
     TextInputType keyboardType = TextInputType.text,
+    bool enabled = true,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      enabled: enabled,
       style: const TextStyle(fontSize: 18, color: Colors.black),
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(color: Colors.black87),
         filled: true,
-        fillColor: Colors.white,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+        fillColor: enabled ? Colors.white : Colors.grey.shade200,
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 18,
+        ),
         border: OutlineInputBorder(
           borderSide: const BorderSide(color: Colors.black),
           borderRadius: BorderRadius.circular(8),

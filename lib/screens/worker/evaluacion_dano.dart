@@ -22,6 +22,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   final TextEditingController cantidadController = TextEditingController();
   int evaluadas = 0;
   int faltan = 0;
+  List<int> historialEvaluaciones = [];
 
   Map<int, int> evaluaciones = {}; // nota -> cantidad
   String mensaje = '';
@@ -74,10 +75,16 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   }
 
   void borrarUltimo() {
-    if (evaluaciones.isNotEmpty) {
-      final ultimaClave = evaluaciones.keys.last;
+    if (historialEvaluaciones.isNotEmpty) {
+      final ultimaNota = historialEvaluaciones.removeLast();
+
       setState(() {
-        evaluaciones.remove(ultimaClave);
+        final cantidadActual = evaluaciones[ultimaNota] ?? 0;
+        if (cantidadActual > 1) {
+          evaluaciones[ultimaNota] = cantidadActual - 1;
+        } else {
+          evaluaciones.remove(ultimaNota);
+        }
       });
     }
   }
@@ -172,13 +179,10 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
           child: Column(
             children: [
               Text(
-                "🔢 Daño evaluado: $evaluadas / ${widget.totalRaices}",
-                style: const TextStyle(color: Colors.white, fontSize: 18),
+                "Raíces a evaluar: ${widget.totalRaices}",
+                style: const TextStyle(color: Colors.white, fontSize: 30),
               ),
-              Text(
-                "⏳ Faltan: $faltan raíces",
-                style: const TextStyle(color: Colors.white70, fontSize: 16),
-              ),
+
               if (completado)
                 Padding(
                   padding: const EdgeInsets.only(top: 12.0),
@@ -211,52 +215,63 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                             ? null
                             : () async {
                               setState(() {
-                                evaluaciones[index] = cantidad + 1;
+                                evaluaciones[index] =
+                                    (evaluaciones[index] ?? 0) + 1;
+                                historialEvaluaciones.add(index);
                               });
+
                               await player.play(AssetSource('sounds/beep.mp3'));
                             },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color:
-                            completado
-                                ? Colors.grey.shade800
-                                : const Color.fromARGB(255, 16, 80, 112),
-                        border: Border.all(color: Colors.white, width: 2),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
+                    child: Stack(
+                      children: [
+                        // Fondo del botón
+                        Container(
+                          decoration: BoxDecoration(
+                            color:
+                                completado
+                                    ? Colors.grey.shade800
+                                    : const Color.fromARGB(255, 16, 80, 112),
+                            border: Border.all(color: Colors.white, width: 2),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
                             "$index",
                             style: const TextStyle(
-                              fontSize: 26,
+                              fontSize: 80,
                               color: Colors.white,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
-                          const SizedBox(height: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 2,
-                            ),
+                        ),
+
+                        // Contador amarillo al fondo, pegado al borde inferior
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 4),
                             decoration: BoxDecoration(
                               color: Colors.yellow.shade700,
-                              borderRadius: BorderRadius.circular(6),
+                              borderRadius: const BorderRadius.only(
+                                bottomLeft: Radius.circular(10),
+                                bottomRight: Radius.circular(10),
+                              ),
                             ),
-                            child: Text(
-                              "$cantidad",
-                              style: const TextStyle(
-                                fontSize: 18,
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
+                            child: Center(
+                              child: Text(
+                                "$cantidad",
+                                style: const TextStyle(
+                                  fontSize: 28,
+                                  color: Colors.black,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   );
                 }),
@@ -267,7 +282,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
               Container(
                 padding: const EdgeInsets.symmetric(
                   vertical: 12,
-                  horizontal: 20,
+                  horizontal: 40,
                 ),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade900,
@@ -275,11 +290,32 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  "$totalRaices Raíces",
+                  "Total Raíces: $totalRaices ",
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 22,
+                    fontSize: 30,
                     fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: guardarEvaluacion,
+                  icon: const Icon(Icons.save),
+                  label: const Text(
+                    "Guardar evaluación",
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF04bc04),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
                   ),
                 ),
               ),
@@ -288,7 +324,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
               const Divider(color: Colors.white38),
 
               Text(
-                "📊 Frecuencia acumulada",
+                "Frecuencia acumulada",
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
                   color: Colors.white,
                   fontSize: 20,
@@ -359,8 +395,8 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 26,
+                        vertical: 28,
                       ),
                     ),
                   ),
@@ -374,34 +410,12 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white),
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
+                        horizontal: 26,
+                        vertical: 28,
                       ),
                     ),
                   ),
                 ],
-              ),
-
-              const SizedBox(height: 20),
-
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: guardarEvaluacion,
-                  icon: const Icon(Icons.save),
-                  label: const Text(
-                    "Guardar evaluación",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF04bc04),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
               ),
 
               const SizedBox(height: 10),

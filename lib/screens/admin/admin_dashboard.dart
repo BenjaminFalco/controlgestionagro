@@ -36,7 +36,7 @@ class AdminDashboard extends StatelessWidget {
               children: [
                 _buildCompactButton(
                   context,
-                  "Crear Ciudad",
+                  "Crear Localidad",
                   Icons.location_city,
                   () => Navigator.push(
                     context,
@@ -45,7 +45,7 @@ class AdminDashboard extends StatelessWidget {
                 ),
                 _buildCompactButton(
                   context,
-                  "Crear Serie",
+                  "Crear Ensayo",
                   Icons.map,
                   () => Navigator.push(
                     context,

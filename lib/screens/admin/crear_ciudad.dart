@@ -17,7 +17,7 @@ class _CrearCiudadState extends State<CrearCiudad> {
 
     if (nombreCiudad.isEmpty) {
       setState(() {
-        mensaje = "⚠️ Debes ingresar un nombre de ciudad.";
+        mensaje = "⚠️ Debes ingresar un nombre de localidad.";
       });
       return;
     }
@@ -29,12 +29,12 @@ class _CrearCiudadState extends State<CrearCiudad> {
       });
 
       setState(() {
-        mensaje = "✅ Ciudad '$nombreCiudad' creada exitosamente.";
+        mensaje = "✅ Localidad '$nombreCiudad' creada exitosamente.";
         ciudadController.clear();
       });
     } catch (e) {
       setState(() {
-        mensaje = "❌ Error al crear ciudad: ${e.toString()}";
+        mensaje = "❌ Error al crear localidad: ${e.toString()}";
       });
     }
   }
@@ -48,7 +48,7 @@ class _CrearCiudadState extends State<CrearCiudad> {
         centerTitle: true,
         elevation: 0,
         title: const Text(
-          "Crear Ciudad",
+          "Crear Localidad",
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -62,7 +62,7 @@ class _CrearCiudadState extends State<CrearCiudad> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 const Text(
-                  "Nombre de la ciudad",
+                  "Nombre de la localidad",
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -76,7 +76,10 @@ class _CrearCiudadState extends State<CrearCiudad> {
                   decoration: InputDecoration(
                     filled: true,
                     fillColor: Colors.white,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 18,
+                    ),
                     hintText: "Ej: Chillán, San Carlos, Los Ángeles...",
                     hintStyle: const TextStyle(color: Colors.black45),
                     border: OutlineInputBorder(
@@ -89,7 +92,10 @@ class _CrearCiudadState extends State<CrearCiudad> {
                     ),
                     focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(color: Color(0xFF005A56), width: 2),
+                      borderSide: const BorderSide(
+                        color: Color(0xFF005A56),
+                        width: 2,
+                      ),
                     ),
                   ),
                 ),
@@ -105,7 +111,7 @@ class _CrearCiudadState extends State<CrearCiudad> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text("Guardar Ciudad"),
+                  child: const Text("Guardar Localidad"),
                 ),
                 const SizedBox(height: 20),
                 if (mensaje.isNotEmpty)
@@ -113,9 +119,10 @@ class _CrearCiudadState extends State<CrearCiudad> {
                     mensaje,
                     style: TextStyle(
                       fontSize: 16,
-                      color: mensaje.startsWith("✅")
-                          ? Colors.green
-                          : mensaje.startsWith("⚠️")
+                      color:
+                          mensaje.startsWith("✅")
+                              ? Colors.green
+                              : mensaje.startsWith("⚠️")
                               ? Colors.orange
                               : Colors.red,
                     ),

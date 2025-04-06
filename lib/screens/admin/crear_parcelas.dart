@@ -15,6 +15,9 @@ class _CrearParcelasState extends State<CrearParcelas> {
   String? serieSeleccionada;
   int cantidadParcelas = 0;
   int cantidadBloques = 0;
+  bool copiarDesdeOtraSerie = false;
+  String? ciudadOrigen;
+  String? serieOrigen;
 
   Map<String, List<DocumentSnapshot>> parcelasPorBloque = {};
   bool cargandoParcelas = false;
@@ -145,6 +148,180 @@ class _CrearParcelasState extends State<CrearParcelas> {
     }
   }
 
+  Future<void> cargarNumerosDesdeSerieAnterior(
+    String ciudadId,
+    String serieId,
+  ) async {
+    final bloquesSnapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadId)
+            .collection('series')
+            .doc(serieId)
+            .collection('bloques')
+            .get();
+
+    for (final bloqueDoc in bloquesSnapshot.docs) {
+      final parcelasSnapshot =
+          await bloqueDoc.reference
+              .collection('parcelas')
+              .orderBy('numero')
+              .get();
+
+      for (final parcelaDoc in parcelasSnapshot.docs) {
+        final numero = parcelaDoc['numero'];
+        final numeroFicha = parcelaDoc['numero_ficha'];
+        final numeroTratamiento = parcelaDoc['numero_tratamiento'];
+
+        final bloqueDestino = FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada)
+            .collection('series')
+            .doc(serieSeleccionada)
+            .collection('bloques')
+            .doc(bloqueDoc.id)
+            .collection('parcelas')
+            .where('numero', isEqualTo: numero);
+
+        final result = await bloqueDestino.get();
+        if (result.docs.isNotEmpty) {
+          final ref = result.docs.first.reference;
+          await ref.update({
+            'numero_ficha': numeroFicha,
+            'numero_tratamiento': numeroTratamiento,
+          });
+        }
+      }
+    }
+
+    setState(() {
+      mensaje = "✅ Datos cargados correctamente desde la serie anterior.";
+    });
+    cargarMatrizCompleta();
+  }
+
+  void mostrarModalCompararSeries(BuildContext context) {
+    String? ciudadComparar;
+    String? serieComparar;
+    List<DocumentSnapshot> ciudadesDisponibles = ciudades;
+    List<DocumentSnapshot> seriesDisponibles = [];
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          title: const Text("Seleccionar ciudad y serie"),
+          content: StatefulBuilder(
+            builder: (context, setModalState) {
+              return Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: "Ciudad"),
+                    value: ciudadComparar,
+                    items:
+                        ciudadesDisponibles.map((doc) {
+                          return DropdownMenuItem(
+                            value: doc.id,
+                            child: Text(doc['nombre']),
+                          );
+                        }).toList(),
+                    onChanged: (value) async {
+                      setModalState(() {
+                        ciudadComparar = value;
+                        serieComparar = null;
+                        seriesDisponibles = [];
+                      });
+
+                      if (value != null) {
+                        final snapshot =
+                            await FirebaseFirestore.instance
+                                .collection('ciudades')
+                                .doc(value)
+                                .collection('series')
+                                .get();
+                        setModalState(() {
+                          seriesDisponibles = snapshot.docs;
+                        });
+                      }
+                    },
+                  ),
+                  const SizedBox(height: 10),
+                  DropdownButtonFormField<String>(
+                    decoration: const InputDecoration(labelText: "Serie"),
+                    value: serieComparar,
+                    items:
+                        seriesDisponibles.map((doc) {
+                          return DropdownMenuItem(
+                            value: doc.id,
+                            child: Text(doc['nombre']),
+                          );
+                        }).toList(),
+                    onChanged: (value) {
+                      setModalState(() => serieComparar = value);
+                    },
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Cancelar"),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (ciudadComparar == null || serieComparar == null) return;
+
+                final serieDoc =
+                    await FirebaseFirestore.instance
+                        .collection('ciudades')
+                        .doc(ciudadComparar)
+                        .collection('series')
+                        .doc(serieComparar)
+                        .get();
+
+                final actual =
+                    await FirebaseFirestore.instance
+                        .collection('ciudades')
+                        .doc(ciudadSeleccionada)
+                        .collection('series')
+                        .doc(serieSeleccionada)
+                        .get();
+
+                final int altoNuevo = serieDoc['matriz_alto'] ?? 0;
+                final int largoNuevo = serieDoc['matriz_largo'] ?? 0;
+                final int altoActual = actual['matriz_alto'] ?? 0;
+                final int largoActual = actual['matriz_largo'] ?? 0;
+
+                if (altoNuevo == altoActual && largoNuevo == largoActual) {
+                  Navigator.pop(context);
+                  // 🔄 Aquí puedes llamar una función para cargar automáticamente
+                  cargarNumerosDesdeSerieAnterior(
+                    ciudadComparar!,
+                    serieComparar!,
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        "⚠️ Las dimensiones de la serie no coinciden.",
+                        style: TextStyle(color: Colors.white),
+                      ),
+                      backgroundColor: Colors.redAccent,
+                    ),
+                  );
+                }
+              },
+              child: const Text("Comparar y cargar"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -152,7 +329,7 @@ class _CrearParcelasState extends State<CrearParcelas> {
       appBar: AppBar(
         backgroundColor: const Color(0xFF005A56),
         title: const Text(
-          "Crear Parcelas en Serie",
+          "Crear Parcelas en Ensayo",
           style: TextStyle(color: Colors.white),
         ),
         iconTheme: const IconThemeData(color: Colors.white),
@@ -164,7 +341,7 @@ class _CrearParcelasState extends State<CrearParcelas> {
           children: [
             DropdownButtonFormField<String>(
               value: ciudadSeleccionada,
-              decoration: _dropdownDecoration("Seleccionar ciudad"),
+              decoration: _dropdownDecoration("Seleccionar localidad"),
               items:
                   ciudades.map((doc) {
                     return DropdownMenuItem(
@@ -185,7 +362,7 @@ class _CrearParcelasState extends State<CrearParcelas> {
             const SizedBox(height: 12),
             DropdownButtonFormField<String>(
               value: serieSeleccionada,
-              decoration: _dropdownDecoration("Seleccionar serie"),
+              decoration: _dropdownDecoration("Seleccionar ensayo"),
               items:
                   series.map((doc) {
                     return DropdownMenuItem(
@@ -199,16 +376,25 @@ class _CrearParcelasState extends State<CrearParcelas> {
               },
             ),
             const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: crearBloquesYParcelas,
-              icon: const Icon(Icons.add_box),
-              label: const Text("Crear bloques y parcelas"),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF00B140),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 16),
-              ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: crearBloquesYParcelas,
+                    icon: const Icon(Icons.add_box),
+                    label: const Text("Crear bloques y parcelas"),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF00B140),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+              ],
             ),
+
             const SizedBox(height: 10),
             Text(
               mensaje,
