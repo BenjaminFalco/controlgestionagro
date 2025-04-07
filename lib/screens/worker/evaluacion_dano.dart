@@ -157,8 +157,85 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
     }
   }
 
-  @override
-  @override
+  void _confirmarAvance() {
+    final int totalEvaluadas = evaluaciones.values.fold(0, (a, b) => a + b);
+
+    if (totalEvaluadas < widget.totalRaices) {
+      showDialog(
+        context: context,
+        builder:
+            (_) => AlertDialog(
+              title: const Text("Evaluación incompleta"),
+              content: Text(
+                "Has evaluado $totalEvaluadas de ${widget.totalRaices} raíces. Completa la evaluación antes de continuar.",
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text("Aceptar"),
+                ),
+              ],
+            ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("¿Avanzar a la siguiente parcela?"),
+            content: const Text(
+              "¿Deseas continuar? Esta acción no se puede deshacer.",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  Navigator.pop(context); // Cierra modal
+                  await guardarEvaluacion(); // Guarda
+
+                  if (mounted && mensaje.isEmpty) {
+                    Navigator.pop(
+                      context,
+                      'siguiente',
+                    ); // ⬅️ Devuelve señal a formulario_tratamiento
+                  }
+                },
+                child: const Text("Sí, continuar"),
+              ),
+            ],
+          ),
+    );
+  }
+
+  void _confirmarReinicio() {
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("¿Reiniciar evaluación?"),
+            content: const Text("Se eliminarán todos los datos actuales."),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  reiniciarEvaluacion();
+                },
+                child: const Text("Sí, reiniciar"),
+              ),
+            ],
+          ),
+    );
+  }
+
   Widget build(BuildContext context) {
     int totalRaices = evaluaciones.values.fold(0, (a, b) => a + b);
     final bool completado = totalRaices >= widget.totalRaices;
@@ -230,7 +307,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                             color:
                                 completado
                                     ? Colors.grey.shade800
-                                    : const Color.fromARGB(255, 16, 80, 112),
+                                    : const Color.fromARGB(255, 0, 0, 0),
                             border: Border.all(color: Colors.white, width: 2),
                             borderRadius: BorderRadius.circular(10),
                           ),
@@ -284,11 +361,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   vertical: 12,
                   horizontal: 40,
                 ),
-                decoration: BoxDecoration(
-                  color: Colors.blue.shade900,
-                  border: Border.all(color: Colors.white, width: 2),
-                  borderRadius: BorderRadius.circular(12),
-                ),
                 child: Text(
                   "Total Raíces: $totalRaices ",
                   style: const TextStyle(
@@ -330,46 +402,42 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   fontSize: 20,
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 20),
 
               if (evaluaciones.isNotEmpty)
-                Column(
-                  children:
-                      evaluaciones.entries.map((entry) {
-                        final nota = entry.key;
-                        final cantidad = entry.value;
-                        final porcentaje = cantidad / widget.totalRaices;
-                        final porcentajeTexto = (porcentaje * 100)
-                            .toStringAsFixed(1);
+                Center(
+                  child: SizedBox(
+                    height: 200,
+                    width: 200,
+                    child: PieChart(
+                      PieChartData(
+                        centerSpaceRadius: 30,
+                        sectionsSpace: 2,
+                        sections:
+                            evaluaciones.entries.map((entry) {
+                              final nota = entry.key;
+                              final cantidad = entry.value;
+                              final porcentaje = cantidad / widget.totalRaices;
+                              final porcentajeTexto = (porcentaje * 100)
+                                  .toStringAsFixed(1);
 
-                        return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                "Nota $nota  •  $cantidad raíces  •  $porcentajeTexto%",
-                                style: const TextStyle(
+                              return PieChartSectionData(
+                                value: porcentaje,
+                                color:
+                                    Colors.primaries[nota %
+                                        Colors.primaries.length],
+                                radius: 60,
+                                title: "$nota\n$porcentajeTexto%",
+                                titleStyle: const TextStyle(
                                   color: Colors.white,
-                                  fontSize: 16,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                              ),
-                              const SizedBox(height: 4),
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: LinearProgressIndicator(
-                                  value: porcentaje.clamp(0.0, 1.0),
-                                  minHeight: 12,
-                                  backgroundColor: Colors.white12,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    Colors.lightGreenAccent.shade200,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }).toList(),
+                              );
+                            }).toList(),
+                      ),
+                    ),
+                  ),
                 )
               else
                 const Padding(
@@ -401,7 +469,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: reiniciarEvaluacion,
+                    onPressed: _confirmarReinicio,
                     icon: const Icon(Icons.restart_alt, color: Colors.white),
                     label: const Text(
                       "Reiniciar",

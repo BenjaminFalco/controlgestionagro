@@ -68,7 +68,12 @@ class _CrearParcelasState extends State<CrearParcelas> {
 
     final bloquesSnapshot = await serieRef.collection('bloques').get();
 
-    for (final bloqueDoc in bloquesSnapshot.docs) {
+    // Convertir y ordenar los bloques por ID en orden descendente
+    final bloquesOrdenados =
+        bloquesSnapshot.docs.toList()
+          ..sort((a, b) => b.id.compareTo(a.id)); // D, C, B, A
+
+    for (final bloqueDoc in bloquesOrdenados) {
       final String bloque = bloqueDoc.id;
       final parcelasSnap =
           await bloqueDoc.reference
@@ -80,6 +85,38 @@ class _CrearParcelasState extends State<CrearParcelas> {
     }
 
     setState(() => cargandoParcelas = false);
+  }
+
+  Future<void> generarNumerosAleatorios() async {
+    if (parcelasPorBloque.isEmpty) {
+      setState(() => mensaje = "⚠️ No hay parcelas para procesar.");
+      return;
+    }
+
+    try {
+      for (final entry in parcelasPorBloque.entries) {
+        final bloqueId = entry.key;
+        final parcelas = entry.value;
+
+        final total = parcelas.length;
+        final List<int> numeros = List.generate(total, (index) => index + 1)
+          ..shuffle();
+
+        for (int i = 0; i < total; i++) {
+          final parcela = parcelas[i];
+          final ref = parcela.reference;
+
+          await ref.update({'numero_tratamiento': numeros[i]});
+        }
+      }
+
+      setState(
+        () => mensaje = "✅ Números de tratamiento generados aleatoriamente.",
+      );
+      await cargarMatrizCompleta();
+    } catch (e) {
+      setState(() => mensaje = "❌ Error al generar números: $e");
+    }
   }
 
   Future<void> crearBloquesYParcelas() async {
@@ -392,6 +429,41 @@ class _CrearParcelasState extends State<CrearParcelas> {
                   ),
                 ),
                 const SizedBox(width: 10),
+
+                ElevatedButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder:
+                          (context) => AlertDialog(
+                            title: const Text("¿Generar números aleatorios?"),
+                            content: const Text(
+                              "Se asignarán números de tratamiento aleatorios a todas las parcelas de cada bloque. Esta acción sobrescribirá los valores actuales.",
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text("Cancelar"),
+                              ),
+                              ElevatedButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  generarNumerosAleatorios();
+                                },
+                                child: const Text("Confirmar"),
+                              ),
+                            ],
+                          ),
+                    );
+                  },
+                  icon: const Icon(Icons.shuffle),
+                  label: const Text("Generar número de tratamiento aleatorio"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurple,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                ),
               ],
             ),
 

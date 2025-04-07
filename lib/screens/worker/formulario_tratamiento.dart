@@ -262,6 +262,10 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     });
   }
 
+  void guardarYAvanzarDesdeEvaluacion() async {
+    await guardarTratamiento(); // guarda y llama avanzarParcela()
+  }
+
   void confirmarYSiguiente() {
     if (registros.isEmpty) {
       showDialog(
@@ -304,14 +308,14 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     }
   }
 
-  void irAEvaluacionDano() {
+  void irAEvaluacionDano() async {
     final totalRaices = registros.fold<int>(
       0,
       (sum, r) => sum + (r['cantidad'] as int? ?? 0),
     );
     final parcela = parcelas[currentIndex];
 
-    Navigator.push(
+    final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -321,6 +325,10 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             ),
       ),
     );
+
+    if (resultado == 'siguiente') {
+      await guardarTratamiento(); // Guarda y avanza a la siguiente parcela
+    }
   }
 
   Widget _buildInput(
@@ -372,7 +380,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
           children: [
             Expanded(
               child: Text(
-                "Parcela ${parcela['numero']} - Bloque ${widget.bloqueId}",
+                "T ${parcela['numero_tratamiento']} -  ${widget.bloqueId}",
                 style: const TextStyle(
                   color: Colors.white,
                   fontSize: 20,

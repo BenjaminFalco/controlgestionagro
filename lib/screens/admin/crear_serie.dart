@@ -209,7 +209,7 @@ class _CrearSerieState extends State<CrearSerie> {
 
       setState(() {
         mensaje =
-            "✅ Serie '$nombreSerie' creada con $bloques bloques y $parcelas parcelas por bloque.";
+            "✅ Ensayo '$nombreSerie' creado con $bloques bloques y $parcelas parcelas por bloque.";
         nombreSerieController.clear();
         cantidadParcelasController.clear();
         cantidadBloquesController.clear();
@@ -229,7 +229,10 @@ class _CrearSerieState extends State<CrearSerie> {
         backgroundColor: const Color(0xFF005A56),
         centerTitle: true,
         elevation: 0,
-        title: const Text("Crear Serie", style: TextStyle(color: Colors.white)),
+        title: const Text(
+          "Crear Ensayo",
+          style: TextStyle(color: Colors.white),
+        ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: Center(
@@ -251,18 +254,18 @@ class _CrearSerieState extends State<CrearSerie> {
                           child: Text(doc['nombre']),
                         );
                       }).toList(),
-                  decoration: _dropdownDecoration("Seleccionar ciudad"),
+                  decoration: _dropdownDecoration("Seleccionar localidad"),
                   dropdownColor: Colors.white,
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: nombreSerieController,
-                  label: "Nombre de la serie",
+                  label: "Nombre del ensayo",
                 ),
                 const SizedBox(height: 16),
                 _buildTextField(
                   controller: cantidadBloquesController,
-                  label: "Cantidad de bloques en la serie",
+                  label: "Cantidad de bloques en el ensayo",
                   keyboardType: TextInputType.number,
                   enabled: !usarSerieExistente,
                 ),
@@ -280,7 +283,7 @@ class _CrearSerieState extends State<CrearSerie> {
                 Row(
                   children: [
                     const Text(
-                      "¿Basar en otra serie?",
+                      "¿Basar en otro ensayo?",
                       style: TextStyle(fontSize: 16),
                     ),
                     const Spacer(),
@@ -328,7 +331,7 @@ class _CrearSerieState extends State<CrearSerie> {
                             child: Text(doc['nombre']),
                           );
                         }).toList(),
-                    decoration: _dropdownDecoration("Ciudad base"),
+                    decoration: _dropdownDecoration("Localidad base"),
                   ),
                   const SizedBox(height: 12),
                   DropdownButtonFormField<String>(
@@ -341,7 +344,7 @@ class _CrearSerieState extends State<CrearSerie> {
                             child: Text(doc['nombre']),
                           );
                         }).toList(),
-                    decoration: _dropdownDecoration("Serie base"),
+                    decoration: _dropdownDecoration("Ensayo base"),
                   ),
                 ],
 

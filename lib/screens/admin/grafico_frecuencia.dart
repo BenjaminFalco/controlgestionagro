@@ -287,7 +287,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
         child: Column(
           children: [
             _buildDropdown(
-              "Ciudad",
+              "Localidad",
               ciudadSeleccionada,
               ciudades.map((doc) {
                 return DropdownMenuItem(
@@ -308,7 +308,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             ),
             const SizedBox(height: 10),
             _buildDropdown(
-              "Serie",
+              "Ensayo",
               serieSeleccionada,
               series.map((doc) {
                 return DropdownMenuItem(
@@ -425,44 +425,6 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                             MediaQuery.of(context).size.width *
                             0.5, // mitad del ancho
                         height: 250,
-                        child: BarChart(
-                          BarChartData(
-                            barGroups:
-                                frecuenciaNotas.entries.map((entry) {
-                                  return BarChartGroupData(
-                                    x: entry.key,
-                                    barRods: [
-                                      BarChartRodData(
-                                        toY: entry.value.toDouble(),
-                                        width: 16,
-                                        color: Colors.teal,
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                    ],
-                                  );
-                                }).toList(),
-                            titlesData: FlTitlesData(
-                              bottomTitles: AxisTitles(
-                                sideTitles: SideTitles(
-                                  showTitles: true,
-                                  getTitlesWidget:
-                                      (value, _) => Text("${value.toInt()}"),
-                                ),
-                              ),
-                              leftTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: true),
-                              ),
-                              rightTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                              topTitles: AxisTitles(
-                                sideTitles: SideTitles(showTitles: false),
-                              ),
-                            ),
-                            borderData: FlBorderData(show: false),
-                            gridData: FlGridData(show: true),
-                          ),
-                        ),
                       ),
                     ),
                   ],
