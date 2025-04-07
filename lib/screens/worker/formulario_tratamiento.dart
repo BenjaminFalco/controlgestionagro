@@ -4,6 +4,11 @@ import 'package:flutter/material.dart';
 import 'evaluacion_dano.dart';
 import 'package:intl/intl.dart';
 
+class AlwaysDisabledFocusNode extends FocusNode {
+  @override
+  bool get hasFocus => false;
+}
+
 class FormularioTratamiento extends StatefulWidget {
   final String ciudadId;
   final String serieId;
@@ -29,72 +34,66 @@ class FormularioTratamiento extends StatefulWidget {
 class _FormularioTratamientoState extends State<FormularioTratamiento> {
   List<DocumentSnapshot> parcelas = [];
   int currentIndex = 0;
+  TextEditingController? focusedController;
 
-  final TextEditingController raicesController = TextEditingController();
-  final TextEditingController pesoRaicesController = TextEditingController();
+  final TextEditingController raicesAController = TextEditingController();
+  final TextEditingController raicesBController = TextEditingController();
+  final TextEditingController pesoAController = TextEditingController();
+  final TextEditingController pesoBController = TextEditingController();
   final TextEditingController pesoHojasController = TextEditingController();
   final TextEditingController ndviController = TextEditingController();
   final TextEditingController observacionesController = TextEditingController();
 
   String mensaje = '';
-  List<Map<String, dynamic>> registros = [];
-  String? nombreTrabajador;
-  String? ciudadNombre;
-  String? serieNombre;
 
   @override
   void initState() {
     super.initState();
-    cargarNombreTrabajador();
-    cargarParcelasDesde().then((_) => cargarUltimoTratamiento());
-    obtenerNombres();
+    cargarParcelasDesde();
+    raicesAController.addListener(() => setState(() {}));
+    raicesBController.addListener(() => setState(() {}));
+    pesoAController.addListener(() => setState(() {}));
+    pesoBController.addListener(() => setState(() {}));
   }
 
-  bool secuenciaInversa = true;
+  Future<void> guardarTratamientoActual() async {
+    final parcela = parcelas[currentIndex];
+    final ref = parcela.reference.collection('tratamientos').doc('actual');
 
-  void cambiarSecuencia() {
-    setState(() {
-      secuenciaInversa = !secuenciaInversa;
+    await ref.set({
+      'raicesA': raicesAController.text.trim(),
+      'raicesB': raicesBController.text.trim(),
+      'pesoA': pesoAController.text.trim(),
+      'pesoB': pesoBController.text.trim(),
+      'pesoHojas': pesoHojasController.text.trim(),
+      'ndvi': ndviController.text.trim(),
+      'observaciones': observacionesController.text.trim(),
+      'fecha': Timestamp.now(),
+      'trabajador': FirebaseAuth.instance.currentUser?.email ?? 'desconocido',
     });
   }
 
-  void avanzarParcela() {
-    if (secuenciaInversa) {
-      // Derecha a izquierda (como está ahora)
-      if (currentIndex < parcelas.length - 1) {
-        setState(() {
-          currentIndex++;
-          registros.clear();
-          mensaje = '';
-        });
-      } else {
-        Navigator.pop(context);
-      }
+  Future<void> cargarTratamientoActual() async {
+    if (parcelas.isEmpty) return;
+
+    final parcela = parcelas[currentIndex];
+    final doc =
+        await parcela.reference.collection('tratamientos').doc('actual').get();
+
+    if (doc.exists) {
+      final data = doc.data()!;
+      setState(() {
+        raicesAController.text = data['raicesA'] ?? '';
+        raicesBController.text = data['raicesB'] ?? '';
+        pesoAController.text = data['pesoA'] ?? '';
+        pesoBController.text = data['pesoB'] ?? '';
+        pesoHojasController.text = data['pesoHojas'] ?? '';
+        ndviController.text = data['ndvi'] ?? '';
+        observacionesController.text = data['observaciones'] ?? '';
+      });
     } else {
-      // Izquierda a derecha
-      if (currentIndex > 0) {
-        setState(() {
-          currentIndex--;
-          registros.clear();
-          mensaje = '';
-        });
-      } else {
-        Navigator.pop(context);
-      }
+      limpiarFormulario();
     }
-  }
-
-  Future<void> cargarNombreTrabajador() async {
-    final uid = FirebaseAuth.instance.currentUser!.uid;
-    final snapshot =
-        await FirebaseFirestore.instance.collection('usuarios').doc(uid).get();
-
-    setState(() {
-      nombreTrabajador =
-          snapshot.data()?['nombre'] ??
-          FirebaseAuth.instance.currentUser?.email ??
-          'Desconocido';
-    });
   }
 
   Future<void> cargarParcelasDesde() async {
@@ -115,207 +114,125 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     setState(() {
       parcelas = todas.sublist(desde);
     });
+
+    await cargarTratamientoActual(); // CARGA LOS DATOS
   }
 
-  void agregarRegistro() {
-    final cantidad = int.tryParse(raicesController.text.trim());
-    final peso = double.tryParse(pesoRaicesController.text.trim());
-    final hojas = double.tryParse(pesoHojasController.text.trim());
-    final ndvi = int.tryParse(ndviController.text.trim());
-    final observaciones = observacionesController.text.trim();
+  Widget _buildInput(
+    String label,
+    TextEditingController controller, {
+    int maxLines = 1,
+    bool isNumeric = false,
+  }) {
+    return GestureDetector(
+      onTap: () {
+        if (isNumeric) {
+          setState(() => focusedController = controller);
 
-    if (cantidad == null || peso == null || hojas == null || ndvi == null) {
-      setState(
-        () => mensaje = "⚠️ Todos los campos numéricos deben ser válidos.",
-      );
-      return;
-    }
-
-    final trabajador = FirebaseAuth.instance.currentUser;
-    if (trabajador == null) return;
-
-    setState(() {
-      registros.add({
-        "nombre": trabajador.email,
-        "cantidad": cantidad,
-        "peso": peso,
-        "bloque": widget.bloqueId,
-      });
-      mensaje = '';
-      raicesController.clear();
-      pesoRaicesController.clear();
-      pesoHojasController.clear();
-      ndviController.clear();
-      observacionesController.clear();
-    });
-  }
-
-  Future<void> obtenerNombres() async {
-    try {
-      final ciudadDoc =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(widget.ciudadId)
-              .get();
-      final serieDoc =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(widget.ciudadId)
-              .collection('series')
-              .doc(widget.serieId)
-              .get();
-
-      setState(() {
-        ciudadNombre = ciudadDoc.data()?['nombre'] ?? 'Ciudad';
-        serieNombre = serieDoc.data()?['nombre'] ?? 'Serie';
-      });
-    } catch (e) {
-      setState(() {
-        ciudadNombre = 'Ciudad';
-        serieNombre = 'Serie';
-      });
-    }
-  }
-
-  Future<void> cargarUltimoTratamiento() async {
-    if (parcelas.isEmpty) return;
-
-    final parcela = parcelas[currentIndex];
-    final snap =
-        await parcela.reference
-            .collection('tratamientos')
-            .orderBy('fecha', descending: true)
-            .limit(1)
-            .get();
-
-    if (snap.docs.isNotEmpty) {
-      final data = snap.docs.first.data();
-      final detalle = data['detalle'] as List<dynamic>?;
-
-      if (detalle != null) {
-        setState(() {
-          registros =
-              detalle
-                  .whereType<Map<String, dynamic>>()
-                  .map(
-                    (r) => {
-                      'nombre': r['nombre'] ?? 'Desconocido',
-                      'cantidad': r['cantidad'] as int? ?? 0,
-                      'peso':
-                          r['peso'] is num
-                              ? (r['peso'] as num).toDouble()
-                              : 0.0,
-                    },
-                  )
-                  .toList();
-        });
-      }
-    }
-  }
-
-  Future<void> guardarTratamiento() async {
-    final parcela = parcelas[currentIndex];
-    final totalRaices = registros.fold<int>(
-      0,
-      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
-    );
-    final totalPeso = registros.fold<double>(
-      0.0,
-      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
-    );
-
-    try {
-      await parcela.reference.collection('tratamientos').add({
-        "trabajador_id": FirebaseAuth.instance.currentUser?.uid,
-        "nombre":
-            registros.isNotEmpty ? registros.last['nombre'] : 'Desconocido',
-        "detalle": registros,
-        "fecha": Timestamp.now(),
-        "total_raices": totalRaices,
-        "peso_total_raices": totalPeso,
-      });
-
-      setState(() {
-        mensaje = "✅ Tratamiento guardado.";
-        registros = [];
-      });
-
-      avanzarParcela();
-    } catch (e) {
-      setState(() {
-        mensaje = "❌ Error al guardar: ${e.toString()}";
-      });
-    }
-  }
-
-  Future<void> reiniciarTratamiento() async {
-    final parcela = parcelas[currentIndex];
-    final snap = await parcela.reference.collection('tratamientos').get();
-
-    for (final doc in snap.docs) {
-      await doc.reference.delete();
-    }
-
-    setState(() {
-      registros.clear();
-      mensaje = "⚠️ Tratamiento eliminado.";
-    });
-  }
-
-  void guardarYAvanzarDesdeEvaluacion() async {
-    await guardarTratamiento(); // guarda y llama avanzarParcela()
-  }
-
-  void confirmarYSiguiente() {
-    if (registros.isEmpty) {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text("¿Avanzar sin guardar?"),
-              content: const Text(
-                "Aún no has registrado ningún dato en esta parcela.",
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text("Cancelar"),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    if (currentIndex < parcelas.length - 1) {
-                      setState(() {
-                        registros.clear();
-                        mensaje = '';
-                        currentIndex++;
-                      });
-                    }
-                  },
-                  child: const Text("Avanzar"),
-                ),
-              ],
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: Colors.black,
+            isScrollControlled: true,
+            builder: (_) {
+              return Padding(
+                padding: const EdgeInsets.all(8),
+                child:
+                    label == "NDVI"
+                        ? CustomNDVIPad(
+                          initialValue: controller.text,
+                          onChanged: (val) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              setState(() {
+                                controller.text = val;
+                              });
+                            });
+                          },
+                        )
+                        : CustomNumPad(
+                          initialValue: controller.text,
+                          onChanged: (val) {
+                            WidgetsBinding.instance.addPostFrameCallback((_) {
+                              setState(() {
+                                controller.text = val;
+                              });
+                            });
+                          },
+                        ),
+              );
+            },
+          );
+        }
+      },
+      child: AbsorbPointer(
+        absorbing: isNumeric,
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 10),
+          child: TextField(
+            controller: controller,
+            maxLines: maxLines,
+            keyboardType: isNumeric ? TextInputType.none : TextInputType.text,
+            style: const TextStyle(
+              fontSize: 40,
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
             ),
-      );
-    } else {
-      if (currentIndex < parcelas.length - 1) {
-        setState(() {
-          registros.clear();
-          mensaje = '';
-          currentIndex++;
-        });
-      }
-    }
+            decoration: InputDecoration(
+              labelText: label,
+              labelStyle: const TextStyle(fontSize: 50, color: Colors.red),
+              filled: true,
+              fillColor: Colors.black,
+              contentPadding: const EdgeInsets.symmetric(
+                vertical: 51,
+                horizontal: 30,
+              ),
+              enabledBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.white, width: 10),
+              ),
+              focusedBorder: const OutlineInputBorder(
+                borderSide: BorderSide(color: Colors.cyanAccent, width: 4),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
-  void irAEvaluacionDano() async {
-    final totalRaices = registros.fold<int>(
-      0,
-      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
+  Widget _buildInputPair(
+    String label1,
+    TextEditingController controller1,
+    String label2,
+    TextEditingController controller2, {
+    bool isNumeric = false,
+  }) {
+    return Row(
+      children: [
+        Expanded(child: _buildInput(label1, controller1, isNumeric: isNumeric)),
+        const SizedBox(width: 20),
+        Expanded(child: _buildInput(label2, controller2, isNumeric: isNumeric)),
+      ],
     );
+  }
+
+  void limpiarFormulario() {
+    raicesAController.clear();
+    raicesBController.clear();
+    pesoAController.clear();
+    pesoBController.clear();
+    pesoHojasController.clear();
+    ndviController.clear();
+    observacionesController.clear();
+    setState(() => mensaje = "🧹 Formulario limpio.");
+  }
+
+  void irAEvaluacionDano() {
+    final cantidadA = int.tryParse(raicesAController.text.trim()) ?? 0;
+    final cantidadB = int.tryParse(raicesBController.text.trim()) ?? 0;
+    final totalRaices = cantidadA + cantidadB;
+
     final parcela = parcelas[currentIndex];
 
-    final resultado = await Navigator.push(
+    Navigator.push(
       context,
       MaterialPageRoute(
         builder:
@@ -325,90 +242,40 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             ),
       ),
     );
-
-    if (resultado == 'siguiente') {
-      await guardarTratamiento(); // Guarda y avanza a la siguiente parcela
-    }
-  }
-
-  Widget _buildInput(
-    String label,
-    TextEditingController controller, {
-    int maxLines = 1,
-  }) {
-    return SizedBox(
-      width: 300,
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        style: const TextStyle(fontSize: 18, color: Colors.black),
-        decoration: InputDecoration(
-          labelText: label,
-          labelStyle: const TextStyle(fontSize: 18, color: Colors.black),
-          filled: true,
-          fillColor: Colors.white,
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      ),
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     if (parcelas.isEmpty) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(child: CircularProgressIndicator(color: Colors.white)),
+      );
     }
 
     final parcela = parcelas[currentIndex];
     final String fechaActual = DateFormat('yyyy-MM-dd').format(DateTime.now());
-    final totalRaices = registros.fold<int>(
-      0,
-      (sum, r) => sum + (r['cantidad'] as int? ?? 0),
-    );
-    final totalPeso = registros.fold<double>(
-      0.0,
-      (sum, r) => sum + (r['peso'] as double? ?? 0.0),
-    );
+
+    final cantidadA = int.tryParse(raicesAController.text.trim()) ?? 0;
+    final cantidadB = int.tryParse(raicesBController.text.trim()) ?? 0;
+    final totalRaices = cantidadA + cantidadB;
+
+    final pesoA = double.tryParse(pesoAController.text.trim()) ?? 0.0;
+    final pesoB = double.tryParse(pesoBController.text.trim()) ?? 0.0;
+    final pesoTotal = pesoA + pesoB;
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                "T ${parcela['numero_tratamiento']} -  ${widget.bloqueId}",
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  "Ciudad: ${ciudadNombre ?? '...'}",
-                  style: const TextStyle(fontSize: 20, color: Colors.white70),
-                ),
-                Text(
-                  "Serie: ${serieNombre ?? '...'}",
-                  style: const TextStyle(fontSize: 20, color: Colors.white70),
-                ),
-              ],
-            ),
-          ],
+        title: Text(
+          "T ${parcela['numero']} - BLOQUE ${widget.bloqueId}",
+          style: const TextStyle(fontSize: 40, color: Colors.white),
         ),
       ),
       body: Padding(
-        padding: const EdgeInsets.all(24.0),
+        padding: const EdgeInsets.all(24),
         child: SingleChildScrollView(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -417,220 +284,522 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "📅 Fecha: $fechaActual",
-                    style: const TextStyle(fontSize: 20, color: Colors.white),
+                    "📅 $fechaActual",
+                    style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          const Text("🧾", style: TextStyle(fontSize: 20)),
-                          const SizedBox(width: 8),
-                          Text(
-                            "N° Ficha: ${widget.numeroFicha}",
-                            style: const TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          const Text("🧪", style: TextStyle(fontSize: 20)),
-                          const SizedBox(width: 8),
-                          Text(
-                            "N° Tratamiento: ${widget.numeroTratamiento}",
-                            style: const TextStyle(
-                              fontSize: 20,
-                              color: Colors.white,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                  Text(
+                    "N° Ficha: ${widget.numeroFicha}",
+                    style: const TextStyle(fontSize: 34, color: Colors.white),
+                  ),
+                  Text(
+                    "Tratamiento: ${widget.numeroTratamiento}",
+                    style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
                 ],
               ),
-              const SizedBox(height: 20),
-              Text(
-                "Tratamiento de raíces (Parcela ${currentIndex + 1} de ${parcelas.length})",
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
+              const SizedBox(height: 24),
+
+              _buildInputPair(
+                "N° Raíces 1",
+                raicesAController,
+                "N° Raíces 2",
+                raicesBController,
+                isNumeric: true,
               ),
-              const SizedBox(height: 20),
-              Wrap(
-                spacing: 20,
-                runSpacing: 20,
-                children: [
-                  _buildInput("Cantidad de raíces", raicesController),
-                  _buildInput("Peso raíces (kg)", pesoRaicesController),
-                  _buildInput("Peso hojas (kg)", pesoHojasController),
-                  _buildInput("NDVI", ndviController),
-                  _buildInput(
-                    "Observaciones",
-                    observacionesController,
-                    maxLines: 2,
-                  ),
-                ],
+              _buildInputPair(
+                "Peso Raíces 1 (kg)",
+                pesoAController,
+                "Peso Raíces 2 (kg)",
+                pesoBController,
+                isNumeric: true,
               ),
-              const SizedBox(height: 20),
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: agregarRegistro,
-                  icon: const Icon(Icons.add, size: 28, color: Colors.black),
-                  label: const Text(
-                    "",
-                    style: TextStyle(fontSize: 18, color: Colors.black),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 28,
-                      vertical: 16,
-                    ),
-                  ),
-                ),
+              _buildInput(
+                "Peso hojas (kg)",
+                pesoHojasController,
+                isNumeric: true,
               ),
-              const SizedBox(height: 20),
-              registros.isEmpty
-                  ? const Center(
-                    child: Text(
-                      "No hay datos aún.",
-                      style: TextStyle(fontSize: 18, color: Colors.white),
-                    ),
-                  )
-                  : Column(
-                    children:
-                        registros.map((r) {
-                          return Card(
-                            color: Colors.white,
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            child: ListTile(
-                              title: const Text(
-                                "Nuevo registro",
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.black,
-                                ),
-                              ),
-                              subtitle: Text(
-                                "Raíces: ${r['cantidad']} | Peso: ${r['peso']} kg",
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  color: Colors.black,
-                                ),
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                  ),
-              const SizedBox(height: 20),
+              _buildInput("NDVI", ndviController, isNumeric: true),
+              _buildInput(
+                "Observaciones",
+                observacionesController,
+                maxLines: 3,
+              ),
+
+              const SizedBox(height: 40),
+
               Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white, width: 4),
+                  borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "Total raíces: $totalRaices",
-                      style: const TextStyle(fontSize: 18, color: Colors.black),
+                      "TOTAL RAÍCES: $totalRaices",
+                      style: const TextStyle(
+                        fontSize: 30,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
+                    const SizedBox(height: 10),
                     Text(
-                      "Total peso raíces: ${totalPeso.toStringAsFixed(2)} kg",
-                      style: const TextStyle(fontSize: 18, color: Colors.black),
+                      "TOTAL PESO RAÍCES: ${pesoTotal.toStringAsFixed(2)} kg",
+                      style: const TextStyle(
+                        fontSize: 27,
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: irAEvaluacionDano,
-                    icon: const Icon(Icons.analytics, color: Colors.black),
-                    label: const Text(
-                      "QUINLEI",
-                      style: TextStyle(color: Colors.black),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+              const SizedBox(height: 30),
+
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  vertical: 24.0,
+                  horizontal: 16,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    // Botón QUINLEI alineado a la derecha, más pequeño
+                    Align(
+                      alignment: Alignment.center,
+                      child: ElevatedButton.icon(
+                        onPressed: irAEvaluacionDano,
+                        icon: const Icon(
+                          Icons.analytics_outlined,
+                          size: 44,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          "QUINLEI",
+                          style: TextStyle(fontSize: 48, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueGrey,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 100,
+                            vertical: 20,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                  ElevatedButton.icon(
-                    onPressed: guardarTratamiento,
-                    icon: const Icon(Icons.save, color: Colors.black),
-                    label: const Text(
-                      "Guardar",
-                      style: TextStyle(color: Colors.black),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 24,
-                        vertical: 16,
+                    const SizedBox(height: 20),
+
+                    // Botón SIGUIENTE centrado, más grande
+                    Align(
+                      alignment: Alignment.center,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await guardarTratamientoActual(); // Guarda los datos
+
+                          if (currentIndex < parcelas.length - 1) {
+                            setState(() => currentIndex++);
+                            await cargarTratamientoActual(); // Carga datos del siguiente
+                          } else {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "🎉 ¡Has terminado todas las parcelas!",
+                                ),
+                                backgroundColor: Colors.green,
+                              ),
+                            );
+                          }
+                        },
+                        icon: const Icon(
+                          Icons.save_alt,
+                          size: 34,
+                          color: Colors.white,
+                        ),
+                        label: const Text(
+                          "SIGUIENTE ➡️",
+                          style: TextStyle(fontSize: 60, color: Colors.white),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 100,
+                            vertical: 90,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 10),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton.icon(
-                    onPressed: reiniciarTratamiento,
-                    icon: const Icon(Icons.refresh),
-                    label: const Text("Reiniciar"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.red.shade600,
-                      foregroundColor: Colors.white,
+
+              const SizedBox(height: 30),
+              Align(
+                alignment: Alignment.bottomLeft,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      raicesAController.clear();
+                      raicesBController.clear();
+                      pesoAController.clear();
+                      pesoBController.clear();
+                      pesoHojasController.clear();
+                      ndviController.clear();
+                      observacionesController.clear();
+                      mensaje = "🧹 Formulario limpiado.";
+                      focusedController = null;
+                    });
+                  },
+                  icon: const Icon(
+                    Icons.delete_forever,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                  label: const Text(
+                    "LIMPIAR DATOS",
+                    style: TextStyle(fontSize: 30, color: Colors.white),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 30,
+                      vertical: 22,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  ElevatedButton.icon(
-                    onPressed: cambiarSecuencia,
-                    icon: const Icon(Icons.swap_horiz),
-                    label: Text(
-                      secuenciaInversa
-                          ? "Secuencia: Derecha → Izquierda"
-                          : "Secuencia: Izquierda → Derecha",
-                      style: const TextStyle(color: Colors.black),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                    ),
-                  ),
-                ],
+                ),
               ),
-              const SizedBox(height: 16),
+
               if (mensaje.isNotEmpty)
                 Center(
                   child: Text(
                     mensaje,
                     style: TextStyle(
-                      fontSize: 16,
+                      fontSize: 24,
                       color:
-                          mensaje.startsWith("✅") ? Colors.green : Colors.red,
+                          mensaje.startsWith("✅")
+                              ? Colors.greenAccent
+                              : Colors.redAccent,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class CustomNumPad extends StatefulWidget {
+  final String initialValue;
+  final Function(String) onChanged;
+
+  const CustomNumPad({
+    Key? key,
+    required this.initialValue,
+    required this.onChanged,
+  }) : super(key: key);
+
+  @override
+  State<CustomNumPad> createState() => _CustomNumPadState();
+}
+
+class _CustomNumPadState extends State<CustomNumPad> {
+  late String current;
+
+  @override
+  void initState() {
+    super.initState();
+    current = widget.initialValue;
+  }
+
+  void _input(String val) {
+    setState(() {
+      current += val;
+      widget.onChanged(current); // Actualiza en tiempo real
+    });
+  }
+
+  void _backspace() {
+    setState(() {
+      if (current.isNotEmpty) {
+        current = current.substring(0, current.length - 1);
+        widget.onChanged(current);
+      }
+    });
+  }
+
+  void _submit() {
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keys = [
+      '7',
+      '8',
+      '9',
+      '4',
+      '5',
+      '6',
+      '1',
+      '2',
+      '3',
+      '0',
+      '.',
+      'BORRAR',
+    ];
+
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 18),
+            decoration: BoxDecoration(
+              color: Colors.black,
+              border: Border.all(color: Colors.white, width: 3),
+            ),
+            child: Text(
+              current,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 46,
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
+          GridView.builder(
+            shrinkWrap: true,
+            itemCount: keys.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.6,
+            ),
+            itemBuilder: (context, index) {
+              final key = keys[index];
+              return ElevatedButton(
+                onPressed: () {
+                  if (key == 'BORRAR') {
+                    _backspace();
+                  } else {
+                    _input(key);
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: key == 'BORRAR' ? Colors.red : Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                child: Text(key),
+              );
+            },
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            width: double.infinity,
+            height: 60,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                textStyle: const TextStyle(
+                  fontSize: 28,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              child: const Text("ACEPTAR"),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class CustomNDVIPad extends StatefulWidget {
+  final String initialValue;
+  final Function(String) onChanged;
+
+  const CustomNDVIPad({
+    Key? key,
+    required this.initialValue,
+    required this.onChanged,
+  }) : super(key: key);
+
+  @override
+  State<CustomNDVIPad> createState() => _CustomNDVIPadState();
+}
+
+class _CustomNDVIPadState extends State<CustomNDVIPad> {
+  late String current;
+  String? error;
+
+  @override
+  void initState() {
+    super.initState();
+    current = widget.initialValue;
+    _validate();
+  }
+
+  void _input(String val) {
+    setState(() {
+      if (val == '.' && current.contains('.')) return;
+      current += val;
+      _validate();
+    });
+  }
+
+  void _backspace() {
+    setState(() {
+      if (current.isNotEmpty) {
+        current = current.substring(0, current.length - 1);
+        _validate();
+      }
+    });
+  }
+
+  void _validate() {
+    final value = double.tryParse(current);
+    if (value == null || value < 0 || value > 1) {
+      error = "Debe estar entre 0.00 y 1.00";
+    } else {
+      error = null;
+    }
+    widget.onChanged(current);
+  }
+
+  void _submit() {
+    _validate();
+    if (error == null) {
+      Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: Colors.redAccent,
+          content: Text(error!, style: const TextStyle(fontSize: 20)),
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final keys = [
+      '7',
+      '8',
+      '9',
+      '4',
+      '5',
+      '6',
+      '1',
+      '2',
+      '3',
+      '0',
+      '.',
+      'BORRAR',
+    ];
+
+    return Container(
+      color: Colors.black,
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            decoration: BoxDecoration(
+              border: Border.all(
+                color: error == null ? Colors.white : Colors.red,
+                width: 3,
+              ),
+            ),
+            child: Text(
+              current,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 46,
+                color: error == null ? Colors.white : Colors.redAccent,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (error != null)
+            Text(
+              error!,
+              style: const TextStyle(color: Colors.redAccent, fontSize: 20),
+            ),
+          const SizedBox(height: 16),
+          GridView.builder(
+            shrinkWrap: true,
+            itemCount: keys.length,
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 1.6,
+            ),
+            itemBuilder: (context, index) {
+              final key = keys[index];
+              return ElevatedButton(
+                onPressed: () => key == 'BORRAR' ? _backspace() : _input(key),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: key == 'BORRAR' ? Colors.red : Colors.black,
+                  textStyle: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                child: Text(key),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          SizedBox(
+            width: double.infinity,
+            height: 60,
+            child: ElevatedButton(
+              onPressed: _submit,
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
+              child: const Text(
+                "ACEPTAR",
+                style: TextStyle(fontSize: 24, color: Colors.white),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

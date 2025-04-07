@@ -58,7 +58,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
 
   Future<void> cargarBloques() async {
     if (ciudadSeleccionada == null || serieSeleccionada == null) return;
-
     final snapshot =
         await FirebaseFirestore.instance
             .collection('ciudades')
@@ -67,7 +66,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             .doc(serieSeleccionada)
             .collection('bloques')
             .get();
-
     setState(() {
       bloques = snapshot.docs.map((doc) => doc.id).toList();
     });
@@ -75,7 +73,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
 
   Future<void> cargarParcelas() async {
     if (bloqueSeleccionado == null) return;
-
     final snapshot =
         await FirebaseFirestore.instance
             .collection('ciudades')
@@ -87,7 +84,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             .collection('parcelas')
             .orderBy('numero')
             .get();
-
     setState(() {
       parcelas = snapshot.docs;
     });
@@ -107,7 +103,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
         bloqueSeleccionado == null ||
         parcelaSeleccionada == null)
       return;
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -131,13 +126,15 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+      backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.white,
+        centerTitle: true,
+        toolbarHeight: 120,
         title: const Text(
-          "Posicionar tratamiento en terreno",
+          "POSICIONAR TERRENO\nPARA INICIAR TRATAMIENTO",
           style: TextStyle(
-            fontSize: 24,
+            fontSize: 37,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
@@ -165,16 +162,12 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
           child: Center(
             child: SingleChildScrollView(
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 800), // AUMENTADO
+                constraints: const BoxConstraints(maxWidth: 800),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32.0,
-                  ), // AUMENTADO
+                  padding: const EdgeInsets.symmetric(horizontal: 32.0),
                   child: Column(
                     children: [
                       const SizedBox(height: 24),
-
-                      // Fila 1: Ciudad y Serie
                       Row(
                         children: [
                           Expanded(
@@ -188,8 +181,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     child: Text(
                                       doc['nombre'],
                                       style: const TextStyle(
-                                        color: Color.fromARGB(255, 0, 0, 0),
+                                        color: Colors.white,
                                         fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   );
@@ -221,8 +215,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     child: Text(
                                       doc['nombre'],
                                       style: const TextStyle(
-                                        color: Color.fromARGB(255, 0, 0, 0),
+                                        color: Colors.white,
                                         fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   );
@@ -242,10 +237,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Fila 2: Bloque y Parcela
                       Row(
                         children: [
                           Expanded(
@@ -259,8 +251,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     child: Text(
                                       "Bloque $b",
                                       style: const TextStyle(
-                                        color: Color.fromARGB(255, 0, 0, 0),
+                                        color: Colors.white,
                                         fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   );
@@ -280,16 +273,17 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           Expanded(
                             child: _buildFieldBox(
                               _buildDropdown(
-                                "Parcela de inicio",
+                                "Tratamiento de inicio",
                                 parcelaSeleccionada,
                                 parcelas.map((doc) {
                                   return DropdownMenuItem(
                                     value: doc.id,
                                     child: Text(
-                                      "Parcela ${doc['numero']}",
+                                      "Tratamiento ${doc['numero']}",
                                       style: const TextStyle(
-                                        color: Color.fromARGB(255, 0, 0, 0),
+                                        color: Colors.white,
                                         fontSize: 24,
+                                        fontWeight: FontWeight.bold,
                                       ),
                                     ),
                                   );
@@ -304,31 +298,26 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           ),
                         ],
                       ),
-
                       const SizedBox(height: 16),
-
-                      // Fila 3: Superficie
                       _buildFieldBox(
                         TextField(
                           controller: superficieController,
                           style: const TextStyle(
-                            color: Color.fromARGB(255, 0, 0, 0),
+                            color: Colors.white,
                             fontSize: 24,
+                            fontWeight: FontWeight.bold,
                           ),
                           decoration: const InputDecoration(
                             hintText: "Superficie cosechable (m²)",
                             hintStyle: TextStyle(
-                              color: Color.fromARGB(179, 0, 0, 0),
+                              color: Colors.white70,
                               fontSize: 22,
                             ),
                             border: InputBorder.none,
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 24),
-
-                      // Lista de parcelas
                       SizedBox(
                         height: 250,
                         child:
@@ -337,8 +326,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   child: Text(
                                     "No hay parcelas cargadas.",
                                     style: TextStyle(
-                                      color: Color.fromARGB(153, 226, 226, 226),
+                                      color: Colors.white70,
                                       fontSize: 22,
+                                      fontWeight: FontWeight.bold,
                                     ),
                                   ),
                                 )
@@ -347,36 +337,26 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   itemBuilder: (context, index) {
                                     final doc = parcelas[index];
                                     return Card(
-                                      color: const Color.fromARGB(
-                                        255,
-                                        255,
-                                        255,
-                                        255,
-                                      ),
+                                      color: Colors.black,
                                       shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 4,
-                                      margin: const EdgeInsets.symmetric(
-                                        vertical: 10,
+                                        borderRadius: BorderRadius.circular(8),
+                                        side: const BorderSide(
+                                          color: Colors.white,
+                                          width: 3,
+                                        ),
                                       ),
                                       child: ListTile(
-                                        contentPadding:
-                                            const EdgeInsets.symmetric(
-                                              horizontal: 24,
-                                              vertical: 18,
-                                            ),
                                         title: Text(
-                                          "Parcela ${doc['numero']}",
+                                          "T ${doc['numero']}",
                                           style: const TextStyle(
-                                            color: Color.fromARGB(255, 0, 0, 0),
+                                            color: Colors.white,
+                                            fontSize: 22,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 24,
                                           ),
                                         ),
                                         trailing: const Icon(
                                           Icons.arrow_forward_ios,
-                                          color: Colors.white70,
+                                          color: Colors.white,
                                         ),
                                         onTap: () {
                                           Navigator.push(
@@ -402,10 +382,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   },
                                 ),
                       ),
-
                       const SizedBox(height: 32),
-
-                      // Botón EMPEZAR
                       SizedBox(
                         width: MediaQuery.of(context).size.width * 0.85,
                         height: 80,
@@ -443,14 +420,13 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF04bc04),
-                            foregroundColor: const Color.fromARGB(255, 0, 0, 0),
+                            foregroundColor: Colors.black,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(16),
                             ),
                           ),
                         ),
                       ),
-
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -463,7 +439,6 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
     );
   }
 
-  // 🔧 Dropdown estilizado
   Widget _buildDropdown(
     String label,
     String? value,
@@ -472,34 +447,33 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   ) {
     return DropdownButtonFormField<String>(
       value: value,
-      dropdownColor: const Color.fromARGB(255, 255, 255, 255),
+      dropdownColor: Colors.black,
       decoration: InputDecoration(
         labelText: label,
         labelStyle: const TextStyle(
-          color: Color.fromARGB(179, 0, 0, 0),
+          color: Colors.white,
           fontSize: 22,
+          fontWeight: FontWeight.bold,
         ),
         filled: true,
-        fillColor: Colors.transparent,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
+        fillColor: Colors.black,
         border: InputBorder.none,
       ),
-      style: const TextStyle(color: Color.fromARGB(255, 0, 0, 0), fontSize: 22),
+      style: const TextStyle(color: Colors.white, fontSize: 22),
       items: items,
       onChanged: onChanged,
     );
   }
 
-  // 🧩 Caja visual para inputs
   Widget _buildFieldBox(Widget child) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 10),
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       width: double.infinity,
       decoration: BoxDecoration(
-        color: const Color.fromARGB(255, 255, 255, 255),
-        borderRadius: BorderRadius.circular(14),
+        color: Colors.black,
+        border: Border.all(color: Colors.white, width: 3),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: child,
     );
