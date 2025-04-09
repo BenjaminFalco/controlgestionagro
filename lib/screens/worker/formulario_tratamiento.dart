@@ -1,3 +1,4 @@
+import 'inicio_tratamiento.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
@@ -49,11 +50,91 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
   @override
   void initState() {
     super.initState();
-    cargarParcelasDesde();
+    cargarCiudadYSerie();
+    cargarTodasLasParcelas();
     raicesAController.addListener(() => setState(() {}));
     raicesBController.addListener(() => setState(() {}));
     pesoAController.addListener(() => setState(() {}));
     pesoBController.addListener(() => setState(() {}));
+  }
+
+  Map<String, dynamic>? ciudad;
+  Map<String, dynamic>? serie;
+  Map<String, String> nombresBloques =
+      {}; // bloqueId -> nombre (ej: 'A' → 'Bloque 1')
+
+  Future<void> cargarCiudadYSerie() async {
+    final ciudadSnap =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .get();
+
+    final serieSnap =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .get();
+
+    setState(() {
+      ciudad = ciudadSnap.data();
+      serie = serieSnap.data();
+    });
+  }
+
+  void mostrarModalNumeroFicha() {
+    final TextEditingController numeroInicialController =
+        TextEditingController();
+
+    showDialog(
+      context: context,
+      builder:
+          (context) => AlertDialog(
+            title: const Text("Crear N° Ficha"),
+            content: TextField(
+              controller: numeroInicialController,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(
+                labelText: "Número inicial (ej: 8080)",
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  final numeroInicial = int.tryParse(
+                    numeroInicialController.text.trim(),
+                  );
+                  if (numeroInicial == null) return;
+
+                  int contador = numeroInicial;
+
+                  for (final parcela in parcelas) {
+                    await parcela.reference.update({'numero_ficha': contador});
+                    contador++;
+                  }
+
+                  Navigator.of(context).pop();
+
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        "N° ficha asignado desde $numeroInicial correctamente.",
+                      ),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                },
+                child: const Text("Generar"),
+              ),
+            ],
+          ),
+    );
   }
 
   Future<void> guardarTratamientoActual() async {
@@ -96,26 +177,36 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     }
   }
 
-  Future<void> cargarParcelasDesde() async {
-    final snapshot =
+  Future<void> cargarTodasLasParcelas() async {
+    final bloquesSnap =
         await FirebaseFirestore.instance
             .collection('ciudades')
             .doc(widget.ciudadId)
             .collection('series')
             .doc(widget.serieId)
             .collection('bloques')
-            .doc(widget.bloqueId)
-            .collection('parcelas')
-            .orderBy('numero')
+            .orderBy('nombre') // Ordenar A-Z
             .get();
 
-    final todas = snapshot.docs;
-    final desde = todas.indexWhere((p) => p['numero'] == widget.parcelaDesde);
+    List<DocumentSnapshot> todasParcelas = [];
+
+    for (final bloque in bloquesSnap.docs) {
+      final bloqueId = bloque.id;
+      final nombreBloque = bloque['nombre'];
+      nombresBloques[bloqueId] = nombreBloque;
+
+      final parcelasSnap =
+          await bloque.reference.collection('parcelas').orderBy('numero').get();
+
+      todasParcelas.addAll(parcelasSnap.docs);
+    }
+
     setState(() {
-      parcelas = todas.sublist(desde);
+      parcelas = todasParcelas;
+      currentIndex = 0;
     });
 
-    await cargarTratamientoActual(); // CARGA LOS DATOS
+    await cargarTratamientoActual();
   }
 
   Widget _buildInput(
@@ -172,13 +263,13 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             maxLines: maxLines,
             keyboardType: isNumeric ? TextInputType.none : TextInputType.text,
             style: const TextStyle(
-              fontSize: 40,
+              fontSize: 80,
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
             decoration: InputDecoration(
               labelText: label,
-              labelStyle: const TextStyle(fontSize: 50, color: Colors.red),
+              labelStyle: const TextStyle(fontSize: 50, color: Colors.white),
               filled: true,
               fillColor: Colors.black,
               contentPadding: const EdgeInsets.symmetric(
@@ -189,7 +280,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 borderSide: BorderSide(color: Colors.white, width: 10),
               ),
               focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.cyanAccent, width: 4),
+                borderSide: BorderSide(color: Colors.cyanAccent, width: 10),
               ),
             ),
           ),
@@ -269,11 +360,32 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Text(
-          "T ${parcela['numero']} - BLOQUE ${widget.bloqueId}",
-          style: const TextStyle(fontSize: 40, color: Colors.white),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "T ${parcelas[currentIndex]['numero']} - BLOQUE ${nombresBloques[parcelas[currentIndex].reference.parent.parent!.id] ?? '...'}",
+              style: const TextStyle(fontSize: 40, color: Colors.white),
+            ),
+
+            if (ciudad != null && serie != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    ciudad!['nombre'],
+                    style: const TextStyle(fontSize: 30, color: Colors.white),
+                  ),
+                  Text(
+                    serie!['nombre'],
+                    style: const TextStyle(fontSize: 30, color: Colors.white),
+                  ),
+                ],
+              ),
+          ],
         ),
       ),
+
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: SingleChildScrollView(
@@ -284,15 +396,15 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "📅 $fechaActual",
-                    style: const TextStyle(fontSize: 34, color: Colors.white),
-                  ),
-                  Text(
                     "N° Ficha: ${widget.numeroFicha}",
                     style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
                   Text(
-                    "Tratamiento: ${widget.numeroTratamiento}",
+                    'TRATAMIENTO: ${parcela['numero_tratamiento'] ?? '-'}',
+                    style: const TextStyle(fontSize: 34, color: Colors.white),
+                  ),
+                  Text(
+                    "📅 $fechaActual",
                     style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
                 ],
@@ -339,7 +451,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     Text(
                       "TOTAL RAÍCES: $totalRaices",
                       style: const TextStyle(
-                        fontSize: 30,
+                        fontSize: 80,
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -348,7 +460,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     Text(
                       "TOTAL PESO RAÍCES: ${pesoTotal.toStringAsFixed(2)} kg",
                       style: const TextStyle(
-                        fontSize: 27,
+                        fontSize: 80,
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -393,28 +505,75 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                       ),
                     ),
                     const SizedBox(height: 20),
+                    ElevatedButton.icon(
+                      onPressed: mostrarModalNumeroFicha,
+                      icon: const Icon(
+                        Icons.confirmation_number,
+                        size: 44,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        "Crear N° Ficha",
+                        style: TextStyle(fontSize: 36, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.indigo,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 40,
+                          vertical: 20,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
 
                     // Botón SIGUIENTE centrado, más grande
                     Align(
                       alignment: Alignment.center,
                       child: ElevatedButton.icon(
                         onPressed: () async {
-                          await guardarTratamientoActual(); // Guarda los datos
+                          await guardarTratamientoActual();
 
                           if (currentIndex < parcelas.length - 1) {
                             setState(() => currentIndex++);
-                            await cargarTratamientoActual(); // Carga datos del siguiente
+                            await cargarTratamientoActual();
                           } else {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text(
-                                  "🎉 ¡Has terminado todas las parcelas!",
-                                ),
-                                backgroundColor: Colors.green,
-                              ),
+                            // Última parcela → mostrar modal
+                            await guardarTratamientoActual(); // último guardado
+                            showDialog(
+                              context: context,
+                              barrierDismissible: false,
+                              builder:
+                                  (context) => AlertDialog(
+                                    title: const Text(
+                                      "¡Tratamiento Finalizado!",
+                                    ),
+                                    content: const Text(
+                                      "Has terminado todas las parcelas de todos los bloques.",
+                                    ),
+                                    actions: [
+                                      TextButton(
+                                        onPressed: () {
+                                          Navigator.of(
+                                            context,
+                                          ).pushAndRemoveUntil(
+                                            MaterialPageRoute(
+                                              builder:
+                                                  (_) =>
+                                                      const InicioTratamientoScreen(),
+                                            ),
+                                            (route) => false,
+                                          );
+                                        },
+                                        child: const Text("Volver al inicio"),
+                                      ),
+                                    ],
+                                  ),
                             );
                           }
                         },
+
                         icon: const Icon(
                           Icons.save_alt,
                           size: 34,

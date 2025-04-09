@@ -1,7 +1,7 @@
 <variant
     name="release"
     package="com.example.ensayotratamientoagro"
-    minSdkVersion="23"
+    minSdkVersion="29"
     targetSdkVersion="35"
     mergedManifest="build\intermediates\merged_manifest\release\processReleaseMainManifest\AndroidManifest.xml"
     manifestMergeReport="build\outputs\logs\manifest-merger-release-report.txt"
@@ -31,6 +31,6 @@
       applicationId="com.example.ensayotratamientoagro"
       generatedSourceFolders="build\generated\ap_generated_sources\release\out"
       generatedResourceFolders="build\generated\res\google-services\release;build\generated\res\resValues\release"
-      desugaredMethodsFiles="C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\cc0cf5143dbd07e2f65ea002a220b2a3\transformed\D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\c3498c720c6364371c9c883f47292bc4\transformed\D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

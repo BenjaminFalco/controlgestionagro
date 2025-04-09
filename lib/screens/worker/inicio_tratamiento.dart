@@ -26,7 +26,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   String numeroFicha = '';
   String numeroTratamiento = '';
   final TextEditingController superficieController = TextEditingController(
-    text: "10 mt^2",
+    text: "10 m²",
   );
 
   @override
@@ -279,7 +279,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   return DropdownMenuItem(
                                     value: doc.id,
                                     child: Text(
-                                      "Tratamiento ${doc['numero']}",
+                                      "Tratamiento ${doc['numero_tratamiento']}",
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 24,
@@ -347,7 +347,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                       ),
                                       child: ListTile(
                                         title: Text(
-                                          "T ${doc['numero']}",
+                                          "Posición ${doc['numero']}",
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 22,
@@ -412,7 +412,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   : null,
                           icon: const Icon(Icons.play_arrow, size: 34),
                           label: const Text(
-                            "EMPEZAR TRATAMIENTO",
+                            "INICIAR TOMA DE DATOS",
                             style: TextStyle(
                               fontSize: 26,
                               fontWeight: FontWeight.bold,
