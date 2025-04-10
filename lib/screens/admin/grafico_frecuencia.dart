@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:pdf/widgets.dart' as pw;
@@ -76,63 +77,106 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
   Future<void> cargarFrecuencias() async {
     if (ciudadSeleccionada == null || serieSeleccionada == null) return;
 
-    List<_DatoParcela> tempDatos = [];
-    Map<int, int> acumulador = {for (var i = 0; i <= 7; i++) i: 0};
-    parcelasUnicas.clear();
+    todasLasParcelas.clear();
+    frecuenciaNotas.clear();
+
+    final ciudadDoc =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada)
+            .get();
+    final serieDoc =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada)
+            .collection('series')
+            .doc(serieSeleccionada)
+            .get();
+
+    final nombreCiudad = ciudadDoc.data()?['nombre'] ?? 'Ciudad';
+    final nombreSerie = serieDoc.data()?['nombre'] ?? 'Serie';
+    final superficie = serieDoc.data()?['superficie'] ?? '';
+    final fechaCosecha = serieDoc.data()?['fecha_cosecha']?.toDate();
+    final fechaCreacion = serieDoc.data()?['fecha_creacion']?.toDate();
 
     List<String> bloquesAFiltrar =
         bloqueSeleccionado != null
             ? [bloqueSeleccionado!]
             : bloques.map((b) => b.id).toList();
 
-    for (var bloque in bloquesAFiltrar) {
-      final snapshot =
+    for (String bloqueId in bloquesAFiltrar) {
+      final bloqueDoc =
           await FirebaseFirestore.instance
               .collection('ciudades')
-              .doc(ciudadSeleccionada)
+              .doc(ciudadSeleccionada!)
               .collection('series')
-              .doc(serieSeleccionada)
+              .doc(serieSeleccionada!)
               .collection('bloques')
-              .doc(bloque)
+              .doc(bloqueId)
+              .get();
+      final nombreBloque = bloqueDoc.data()?['nombre'] ?? bloqueId;
+
+      final parcelasSnap =
+          await bloqueDoc.reference
               .collection('parcelas')
+              .orderBy('numero')
               .get();
 
-      for (var doc in snapshot.docs) {
-        final evaluaciones = doc['evaluacion'] as Map<String, dynamic>?;
-        final numero = doc['numero'] ?? int.tryParse(doc.id);
+      for (var parcelaDoc in parcelasSnap.docs) {
+        final data = parcelaDoc.data();
+        final numeroFicha = data['numero_ficha'] ?? 0;
+        final numeroTratamiento = data['numero_tratamiento'] ?? 0;
 
-        if (evaluaciones != null && numero != null) {
-          int total = evaluaciones.values.fold(
-            0,
-            (suma, v) => suma + (v as int),
-          );
-          parcelasUnicas.add(numero);
+        final tratamientoSnap =
+            await parcelaDoc.reference
+                .collection('tratamientos')
+                .doc('actual')
+                .get();
+        final tratamiento = tratamientoSnap.data() ?? {};
 
-          if (parcelaSeleccionada == null || parcelaSeleccionada == numero) {
-            tempDatos.add(
-              _DatoParcela(
-                bloque: bloque,
-                numero: numero,
-                valor: total.toDouble(),
-              ),
-            );
+        final pesoA = double.tryParse(tratamiento['pesoA'] ?? '0') ?? 0;
+        final pesoB = double.tryParse(tratamiento['pesoB'] ?? '0') ?? 0;
+        final pesoRaices = pesoA + pesoB;
+        final pesoHojas = tratamiento['pesoHojas'] ?? '';
+        final ndvi = tratamiento['ndvi'] ?? '';
+        final observaciones = tratamiento['observaciones'] ?? '';
 
-            for (var i = 0; i <= 7; i++) {
-              acumulador[i] =
-                  acumulador[i]! + ((evaluaciones['$i'] ?? 0) as num).toInt();
-            }
-          }
+        final frecuenciaSnap =
+            await parcelaDoc.reference
+                .collection('tratamientos')
+                .doc('frecuencia')
+                .get();
+        final frecData = frecuenciaSnap.data() ?? {};
+        final frecNotas = List<int>.generate(
+          8,
+          (i) => (frecData['$i'] ?? 0 as num).toInt(),
+        );
+
+        // Sumar a frecuencia general
+        for (int i = 0; i <= 7; i++) {
+          frecuenciaNotas[i] = (frecuenciaNotas[i] ?? 0) + frecNotas[i];
         }
+
+        todasLasParcelas.add(
+          _DatoParcela(
+            numeroFicha: numeroFicha,
+            fechaCosecha: fechaCreacion,
+            nombreSerie: nombreSerie,
+            nombreCiudad: nombreCiudad,
+            superficie: superficie,
+            nombreBloque: nombreBloque,
+            numeroTratamiento: numeroTratamiento,
+            pesoRaices: pesoRaices,
+            pesoHojas: pesoHojas,
+            ndvi: ndvi,
+            observaciones: observaciones,
+            frecuenciaNotas: frecNotas,
+          ),
+        );
       }
     }
 
-    parcelasUnicas = parcelasUnicas.toSet().toList()..sort();
-
-    setState(() {
-      todasLasParcelas = tempDatos;
-      datosParcela = tempDatos;
-      frecuenciaNotas = acumulador;
-    });
+    setState(() {});
   }
 
   Future<void> mostrarRutaExportacion(String ruta) async {
@@ -152,19 +196,138 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
     );
   }
 
-  Future<void> exportarExcel() async {
+  Future<void> exportarExcelConTratamientos({
+    required String ciudadId,
+    required String serieId,
+    required String nombreCiudad,
+    required String nombreSerie,
+    required DateTime? fechaCosecha,
+    required BuildContext context,
+  }) async {
     final excel = Excel.createExcel();
-    final sheet = excel['Frecuencia'];
-    sheet.appendRow(['Nota', 'Frecuencia']);
-    for (var i = 0; i <= 7; i++) {
-      sheet.appendRow([i, frecuenciaNotas[i] ?? 0]);
+    final sheet = excel['DatosTratamiento'];
+
+    // Cabecera
+    sheet.appendRow([
+      'N° Ficha',
+      'Fecha Cosecha',
+      'Nombre Ensayo',
+      'Localidad',
+      'Sup. Cosechada (m²)',
+      'Bloque',
+      'N° Tratamiento',
+      'Suma N° raíces',
+      'Peso Raíces (kg)',
+      'Peso Hojas (kg)',
+      'NDVI',
+      'Observaciones',
+      '0',
+      '1',
+      '2',
+      '3',
+      '4',
+      '5',
+      '6',
+      '7',
+    ]);
+
+    // Recorrer bloques
+    final bloquesSnapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadId)
+            .collection('series')
+            .doc(serieId)
+            .collection('bloques')
+            .get();
+
+    for (final bloque in bloquesSnapshot.docs) {
+      final bloqueNombre = bloque['nombre'];
+
+      final parcelasSnapshot =
+          await bloque.reference.collection('parcelas').orderBy('numero').get();
+
+      for (final parcela in parcelasSnapshot.docs) {
+        final numeroFicha = parcela['numero_ficha'] ?? '';
+        final numeroTratamiento = parcela['numero_tratamiento'] ?? '';
+
+        final tratamientosSnap =
+            await parcela.reference
+                .collection('tratamientos')
+                .doc('actual')
+                .get();
+
+        if (!tratamientosSnap.exists) continue;
+        final data = tratamientosSnap.data() ?? {};
+
+        final raicesA = int.tryParse(data['raicesA'] ?? '0') ?? 0;
+        final raicesB = int.tryParse(data['raicesB'] ?? '0') ?? 0;
+        final totalRaices = raicesA + raicesB;
+
+        final pesoRaices =
+            (double.tryParse(data['pesoA'] ?? '0') ?? 0) +
+            (double.tryParse(data['pesoB'] ?? '0') ?? 0);
+
+        final pesoHojas = data['pesoHojas'] ?? '';
+        final ndvi = data['ndvi'] ?? '';
+        final observaciones = data['observaciones'] ?? '';
+
+        // Obtener frecuencia por categoría 0-7
+        final frecuenciaSnap =
+            await parcela.reference
+                .collection('tratamientos')
+                .doc('frecuencia')
+                .get();
+
+        Map<String, dynamic> frecuencias = frecuenciaSnap.data() ?? {};
+        List<int> quinlei = List.generate(
+          8,
+          (i) => frecuencias[i.toString()] ?? 0,
+        );
+
+        sheet.appendRow([
+          numeroFicha,
+          fechaCosecha != null
+              ? DateFormat('yyyy-MM-dd').format(fechaCosecha)
+              : '',
+          nombreSerie,
+          nombreCiudad,
+          "10", // Sup. cosechada
+          bloqueNombre,
+          numeroTratamiento,
+          totalRaices,
+          pesoRaices,
+          pesoHojas,
+          ndvi,
+          observaciones,
+          ...quinlei,
+        ]);
+      }
     }
+
     final bytes = excel.encode();
     final dir = await getApplicationDocumentsDirectory();
-    final path = "${dir.path}/frecuencia_export.xlsx";
+    final path = "${dir.path}/tratamientos_export.xlsx";
     final file = File(path)..writeAsBytesSync(bytes!);
-    await mostrarRutaExportacion(path);
-    Share.shareFiles([file.path], text: "Exportación de Frecuencia (Excel)");
+
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text("✅ Exportación exitosa"),
+            content: Text(
+              "El archivo Excel ha sido exportado correctamente a:\n\n$path",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Aceptar"),
+              ),
+            ],
+          ),
+    );
+
+    Share.shareFiles([file.path], text: "Tratamiento exportado (Excel)");
   }
 
   Future<void> exportarPDF() async {
@@ -264,21 +427,29 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
     double promedio =
         datosParcela.isEmpty
             ? 0
-            : datosParcela.map((e) => e.valor).reduce((a, b) => a + b) /
+            : datosParcela
+                    .map((e) => double.tryParse(e.ndvi) ?? 0)
+                    .reduce((a, b) => a + b) /
                 datosParcela.length;
+
     double maximo =
         datosParcela.isEmpty
             ? 0
-            : datosParcela.map((e) => e.valor).reduce((a, b) => a > b ? a : b);
+            : datosParcela
+                .map((e) => double.tryParse(e.ndvi) ?? 0)
+                .reduce((a, b) => a > b ? a : b);
+
     double minimo =
         datosParcela.isEmpty
             ? 0
-            : datosParcela.map((e) => e.valor).reduce((a, b) => a < b ? a : b);
+            : datosParcela
+                .map((e) => double.tryParse(e.ndvi) ?? 0)
+                .reduce((a, b) => a < b ? a : b);
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Gráfico Frecuencia Absoluta"),
+        title: const Text("Gráfico Frecuencia Acumulada"),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
       ),
@@ -361,85 +532,141 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             const SizedBox(height: 20),
             Expanded(
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  if (frecuenciaNotas.isEmpty)
-                    const Center(child: Text("No hay datos para mostrar."))
-                  else ...[
-                    Table(
-                      border: TableBorder.all(color: Colors.black),
-                      defaultVerticalAlignment:
-                          TableCellVerticalAlignment.middle,
-                      children: [
-                        TableRow(
-                          decoration: const BoxDecoration(
-                            color: Color(0xFFE0E0E0),
+                  const SizedBox(height: 12),
+
+                  if (todasLasParcelas.isEmpty)
+                    const Center(
+                      child: Text(
+                        "No hay datos para mostrar.",
+                        style: TextStyle(fontSize: 18, color: Colors.grey),
+                      ),
+                    )
+                  else
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: DataTable(
+                          headingRowColor: MaterialStateProperty.all(
+                            Color(0xFFE0E0E0),
                           ),
-                          children: [
-                            for (int i = 0; i <= 7; i++)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text(
-                                    "$i",
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.bold,
+                          columns: const [
+                            DataColumn(label: Text("N° Ficha")),
+                            DataColumn(label: Text("Fecha Creación")),
+                            DataColumn(label: Text("Nombre Ensayo")),
+                            DataColumn(label: Text("Localidad")),
+                            DataColumn(label: Text("Superficie")),
+                            DataColumn(label: Text("Bloque")),
+                            DataColumn(label: Text("N° Tratamiento")),
+                            DataColumn(label: Text("Peso Raíces (kg)")),
+                            DataColumn(label: Text("Peso Hojas (kg)")),
+                            DataColumn(label: Text("NDVI")),
+                            DataColumn(label: Text("Observaciones")),
+                            DataColumn(label: Text("0")),
+                            DataColumn(label: Text("1")),
+                            DataColumn(label: Text("2")),
+                            DataColumn(label: Text("3")),
+                            DataColumn(label: Text("4")),
+                            DataColumn(label: Text("5")),
+                            DataColumn(label: Text("6")),
+                            DataColumn(label: Text("7")),
+                          ],
+                          rows:
+                              todasLasParcelas.map((p) {
+                                return DataRow(
+                                  cells: [
+                                    DataCell(Text(p.numeroFicha.toString())),
+                                    DataCell(
+                                      Text(
+                                        p.fechaCosecha != null
+                                            ? DateFormat(
+                                              'yyyy-MM-dd',
+                                            ).format(p.fechaCosecha!)
+                                            : '',
+                                      ),
                                     ),
-                                  ),
-                                ),
-                              ),
-                            const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Text(
-                                "Total",
-                                style: TextStyle(fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ],
+                                    DataCell(Text(p.nombreSerie)),
+                                    DataCell(Text(p.nombreCiudad)),
+                                    DataCell(Text(p.superficie ?? '')),
+                                    DataCell(Text(p.nombreBloque)),
+                                    DataCell(
+                                      Text(p.numeroTratamiento.toString()),
+                                    ),
+                                    DataCell(
+                                      Text(p.pesoRaices.toStringAsFixed(2)),
+                                    ),
+                                    DataCell(Text(p.pesoHojas)),
+                                    DataCell(Text(p.ndvi)),
+                                    DataCell(Text(p.observaciones)),
+                                    for (int i = 0; i <= 7; i++)
+                                      DataCell(
+                                        Text(p.frecuenciaNotas[i].toString()),
+                                      ),
+                                  ],
+                                );
+                              }).toList(),
                         ),
-                        TableRow(
-                          children: [
-                            for (int i = 0; i <= 7; i++)
-                              Center(
-                                child: Padding(
-                                  padding: const EdgeInsets.all(8.0),
-                                  child: Text("${frecuenciaNotas[i] ?? 0}"),
-                                ),
-                              ),
-                            Padding(
-                              padding: const EdgeInsets.all(8.0),
-                              child: Text(
-                                "${frecuenciaNotas.values.reduce((a, b) => a + b)}",
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 20),
-                    Center(
-                      child: SizedBox(
-                        width:
-                            MediaQuery.of(context).size.width *
-                            0.5, // mitad del ancho
-                        height: 250,
                       ),
                     ),
-                  ],
+
                   const SizedBox(height: 16),
                   Wrap(
                     spacing: 10,
+                    alignment: WrapAlignment.center,
                     children: [
                       ElevatedButton.icon(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.green.shade600,
                           foregroundColor: Colors.white,
                         ),
-                        onPressed: exportarExcel,
                         icon: const Icon(Icons.table_chart),
                         label: const Text("Exportar Excel"),
+                        onPressed: () async {
+                          if (ciudadSeleccionada == null ||
+                              serieSeleccionada == null) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  "⚠️ Debes seleccionar ciudad y serie",
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final ciudadId = ciudadSeleccionada!;
+                          final serieId = serieSeleccionada!;
+
+                          final ciudadDoc =
+                              await FirebaseFirestore.instance
+                                  .collection('ciudades')
+                                  .doc(ciudadId)
+                                  .get();
+                          final nombreCiudad =
+                              ciudadDoc.data()?['nombre'] ?? 'Ciudad';
+
+                          final serieDoc =
+                              await FirebaseFirestore.instance
+                                  .collection('ciudades')
+                                  .doc(ciudadId)
+                                  .collection('series')
+                                  .doc(serieId)
+                                  .get();
+                          final nombreSerie =
+                              serieDoc.data()?['nombre'] ?? 'Serie';
+                          final fechaCosecha =
+                              serieDoc.data()?['fecha_cosecha']?.toDate();
+
+                          await exportarExcelConTratamientos(
+                            ciudadId: ciudadId,
+                            serieId: serieId,
+                            nombreCiudad: nombreCiudad,
+                            nombreSerie: nombreSerie,
+                            fechaCosecha: fechaCosecha,
+                            context: context,
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -454,13 +681,31 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 }
 
 class _DatoParcela {
-  final String bloque;
-  final int numero;
-  final double valor;
+  final int numeroFicha;
+  final DateTime? fechaCosecha; // ✅ AÑADIDO
+  final String nombreSerie;
+  final String nombreCiudad;
+  final String? superficie;
+  final String nombreBloque;
+  final int numeroTratamiento;
+  final double pesoRaices;
+  final String pesoHojas;
+  final String ndvi;
+  final String observaciones;
+  final List<int> frecuenciaNotas;
 
   _DatoParcela({
-    required this.bloque,
-    required this.numero,
-    required this.valor,
+    required this.numeroFicha,
+    required this.fechaCosecha, // ✅ AÑADIDO
+    required this.nombreSerie,
+    required this.nombreCiudad,
+    required this.superficie,
+    required this.nombreBloque,
+    required this.numeroTratamiento,
+    required this.pesoRaices,
+    required this.pesoHojas,
+    required this.ndvi,
+    required this.observaciones,
+    required this.frecuenciaNotas,
   });
 }

@@ -84,59 +84,6 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     });
   }
 
-  void mostrarModalNumeroFicha() {
-    final TextEditingController numeroInicialController =
-        TextEditingController();
-
-    showDialog(
-      context: context,
-      builder:
-          (context) => AlertDialog(
-            title: const Text("Crear N° Ficha"),
-            content: TextField(
-              controller: numeroInicialController,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: "Número inicial (ej: 8080)",
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text("Cancelar"),
-              ),
-              ElevatedButton(
-                onPressed: () async {
-                  final numeroInicial = int.tryParse(
-                    numeroInicialController.text.trim(),
-                  );
-                  if (numeroInicial == null) return;
-
-                  int contador = numeroInicial;
-
-                  for (final parcela in parcelas) {
-                    await parcela.reference.update({'numero_ficha': contador});
-                    contador++;
-                  }
-
-                  Navigator.of(context).pop();
-
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        "N° ficha asignado desde $numeroInicial correctamente.",
-                      ),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                },
-                child: const Text("Generar"),
-              ),
-            ],
-          ),
-    );
-  }
-
   Future<void> guardarTratamientoActual() async {
     final parcela = parcelas[currentIndex];
     final ref = parcela.reference.collection('tratamientos').doc('actual');
@@ -313,7 +260,6 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     pesoHojasController.clear();
     ndviController.clear();
     observacionesController.clear();
-    setState(() => mensaje = "🧹 Formulario limpio.");
   }
 
   void irAEvaluacionDano() {
@@ -374,11 +320,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 children: [
                   Text(
                     ciudad!['nombre'],
-                    style: const TextStyle(fontSize: 30, color: Colors.white),
+                    style: const TextStyle(fontSize: 26, color: Colors.white),
                   ),
                   Text(
                     serie!['nombre'],
-                    style: const TextStyle(fontSize: 30, color: Colors.white),
+                    style: const TextStyle(fontSize: 26, color: Colors.white),
                   ),
                 ],
               ),
@@ -396,11 +342,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    "N° Ficha: ${widget.numeroFicha}",
+                    "N° Ficha: ${parcela['numero_ficha'] ?? '-'}",
                     style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
                   Text(
-                    'TRATAMIENTO: ${parcela['numero_tratamiento'] ?? '-'}',
+                    'N° TRATAMIENTO: ${parcela['numero_tratamiento'] ?? '-'}',
                     style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
                   Text(
@@ -505,28 +451,6 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                       ),
                     ),
                     const SizedBox(height: 20),
-                    ElevatedButton.icon(
-                      onPressed: mostrarModalNumeroFicha,
-                      icon: const Icon(
-                        Icons.confirmation_number,
-                        size: 44,
-                        color: Colors.white,
-                      ),
-                      label: const Text(
-                        "Crear N° Ficha",
-                        style: TextStyle(fontSize: 36, color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.indigo,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 40,
-                          vertical: 20,
-                        ),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                    ),
 
                     // Botón SIGUIENTE centrado, más grande
                     Align(
@@ -539,8 +463,19 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                             setState(() => currentIndex++);
                             await cargarTratamientoActual();
                           } else {
-                            // Última parcela → mostrar modal
-                            await guardarTratamientoActual(); // último guardado
+                            // Última parcela → guardar tratamiento y registrar fecha de cosecha en la serie
+                            await guardarTratamientoActual();
+
+                            final serieRef = FirebaseFirestore.instance
+                                .collection('ciudades')
+                                .doc(widget.ciudadId)
+                                .collection('series')
+                                .doc(widget.serieId);
+
+                            await serieRef.update({
+                              'fecha_cosecha': Timestamp.now(),
+                            });
+
                             showDialog(
                               context: context,
                               barrierDismissible: false,
