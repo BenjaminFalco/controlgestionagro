@@ -99,10 +99,16 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
     final fechaCosecha = serieDoc.data()?['fecha_cosecha']?.toDate();
     final fechaCreacion = serieDoc.data()?['fecha_creacion']?.toDate();
 
-    List<String> bloquesAFiltrar =
-        bloqueSeleccionado != null
-            ? [bloqueSeleccionado!]
-            : bloques.map((b) => b.id).toList();
+    final bloquesSnapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(ciudadSeleccionada!)
+            .collection('series')
+            .doc(serieSeleccionada!)
+            .collection('bloques')
+            .get();
+
+    final bloquesAFiltrar = bloquesSnapshot.docs.map((b) => b.id).toList();
 
     for (String bloqueId in bloquesAFiltrar) {
       final bloqueDoc =
@@ -141,18 +147,14 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
         final ndvi = tratamiento['ndvi'] ?? '';
         final observaciones = tratamiento['observaciones'] ?? '';
 
-        final frecuenciaSnap =
-            await parcelaDoc.reference
-                .collection('tratamientos')
-                .doc('frecuencia')
-                .get();
-        final frecData = frecuenciaSnap.data() ?? {};
+        // ✅ Cargar evaluación desde campo directo en "parcelas"
+        final evaluacionMap = data['evaluacion'] ?? {};
         final frecNotas = List<int>.generate(
           8,
-          (i) => (frecData['$i'] ?? 0 as num).toInt(),
+          (i) => (evaluacionMap['$i'] ?? 0) as int,
         );
 
-        // Sumar a frecuencia general
+        // ✅ Sumar a frecuencia general
         for (int i = 0; i <= 7; i++) {
           frecuenciaNotas[i] = (frecuenciaNotas[i] ?? 0) + frecNotas[i];
         }
@@ -470,9 +472,9 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                 setState(() {
                   ciudadSeleccionada = value;
                   serieSeleccionada = null;
-                  bloqueSeleccionado = null;
                   datosParcela = [];
-                  parcelaSeleccionada = null;
+                  todasLasParcelas.clear();
+                  frecuenciaNotas.clear();
                 });
                 cargarSeries();
               },
@@ -490,45 +492,14 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
               (value) {
                 setState(() {
                   serieSeleccionada = value;
-                  bloqueSeleccionado = null;
-                  parcelaSeleccionada = null;
                   datosParcela = [];
+                  todasLasParcelas.clear();
+                  frecuenciaNotas.clear();
                 });
-                cargarBloques();
+                cargarFrecuencias(); // 👈 Carga directamente todas las parcelas de todos los bloques
               },
             ),
-            const SizedBox(height: 10),
-            _buildDropdown(
-              "Bloque (opcional)",
-              bloqueSeleccionado,
-              bloques.map((b) {
-                return DropdownMenuItem(
-                  value: b.id,
-                  child: Text("Bloque ${b.id}"),
-                );
-              }).toList(),
-              (value) {
-                setState(() {
-                  bloqueSeleccionado = value;
-                  parcelaSeleccionada = null;
-                });
-                cargarFrecuencias();
-              },
-            ),
-            const SizedBox(height: 10),
-            _buildDropdown(
-              "Parcela (opcional)",
-              parcelaSeleccionada,
-              parcelasUnicas.map((n) {
-                return DropdownMenuItem(value: n, child: Text("Parcela $n"));
-              }).toList(),
-              (value) {
-                setState(() {
-                  parcelaSeleccionada = value;
-                });
-                cargarFrecuencias();
-              },
-            ),
+
             const SizedBox(height: 20),
             Expanded(
               child: Column(
@@ -571,6 +542,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                             DataColumn(label: Text("5")),
                             DataColumn(label: Text("6")),
                             DataColumn(label: Text("7")),
+                            DataColumn(label: Text("Total")),
                           ],
                           rows:
                               todasLasParcelas.map((p) {
@@ -603,6 +575,9 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                                       DataCell(
                                         Text(p.frecuenciaNotas[i].toString()),
                                       ),
+                                    DataCell(
+                                      Text(p.totalEvaluadas.toString()),
+                                    ), // 👈 NUEVO
                                   ],
                                 );
                               }).toList(),
@@ -708,4 +683,7 @@ class _DatoParcela {
     required this.observaciones,
     required this.frecuenciaNotas,
   });
+
+  int get totalEvaluadas =>
+      frecuenciaNotas.fold(0, (a, b) => a + b); // 👈 NUEVO
 }
