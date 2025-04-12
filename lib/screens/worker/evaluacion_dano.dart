@@ -6,11 +6,15 @@ import 'package:audioplayers/audioplayers.dart';
 class EvaluacionDanoScreen extends StatefulWidget {
   final DocumentReference parcelaRef;
   final int totalRaices;
+  final String ciudadId;
+  final String serieId;
 
   const EvaluacionDanoScreen({
     super.key,
     required this.parcelaRef,
     required this.totalRaices,
+    required this.ciudadId,
+    required this.serieId,
   });
 
   @override
@@ -23,6 +27,12 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   int evaluadas = 0;
   int faltan = 0;
   List<int> historialEvaluaciones = [];
+  bool evaluacionGuardada = false;
+
+  Map<String, dynamic>? ciudad;
+  Map<String, dynamic>? serie;
+  Map<String, dynamic>? parcelaData;
+  Map<String, String> nombresBloques = {};
 
   Map<int, int> evaluaciones = {}; // nota -> cantidad
   String mensaje = '';
@@ -31,6 +41,9 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
   void initState() {
     super.initState();
     cargarEvaluacionDesdeFirestore(); // <- aquí se carga la evaluación previa
+    cargarCiudadYSerie();
+    cargarNombresBloques();
+    cargarParcela();
   }
 
   Widget _buildNotaButton(int nota) {
@@ -49,6 +62,51 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> cargarCiudadYSerie() async {
+    final ciudadSnap =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .get();
+
+    final serieSnap =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .get();
+
+    setState(() {
+      ciudad = ciudadSnap.data();
+      serie = serieSnap.data();
+    });
+  }
+
+  Future<void> cargarNombresBloques() async {
+    final bloquesSnapshot =
+        await FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId)
+            .collection('bloques')
+            .get();
+
+    setState(() {
+      for (final doc in bloquesSnapshot.docs) {
+        nombresBloques[doc.id] = doc['nombre'];
+      }
+    });
+  }
+
+  Future<void> cargarParcela() async {
+    final snap = await widget.parcelaRef.get();
+    setState(() {
+      parcelaData = snap.data() as Map<String, dynamic>?;
+    });
   }
 
   Future<void> agregarEvaluacion(int nota) async {
@@ -133,6 +191,10 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 ],
               ),
         );
+
+        setState(() {
+          evaluacionGuardada = true;
+        });
       }
 
       await cargarEvaluacionDesdeFirestore(); // Refresca evaluación
@@ -243,13 +305,66 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
-        backgroundColor: Colors.white,
-        title: const Text(
-          "QUINLEI - Evaluación de daño",
-          style: TextStyle(color: Colors.black),
+        backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back,
+            color: Color.fromARGB(255, 255, 255, 255),
+          ),
+          onPressed: () {
+            if (evaluacionGuardada) {
+              Navigator.of(context).pop();
+            } else {
+              showDialog(
+                context: context,
+                builder:
+                    (_) => AlertDialog(
+                      title: const Text("¿Retroceder sin guardar cambios?"),
+                      content: const Text("Perderás los datos no guardados."),
+                      actions: [
+                        TextButton(
+                          onPressed:
+                              () => Navigator.of(context).pop(), // Cierra modal
+                          child: const Text("Cancelar"),
+                        ),
+                        TextButton(
+                          onPressed: () {
+                            Navigator.of(context).pop(); // Cierra modal
+                            Navigator.of(context).pop(); // Retrocede
+                          },
+                          child: const Text("Salir sin guardar"),
+                        ),
+                      ],
+                    ),
+              );
+            }
+          },
         ),
-        iconTheme: const IconThemeData(color: Colors.black),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              "T ${parcelaData?['numero_tratamiento'] ?? ''} - BLOQUE ${nombresBloques[widget.parcelaRef.parent.parent!.id] ?? ''}",
+              style: const TextStyle(fontSize: 40, color: Colors.white),
+            ),
+            if (ciudad != null && serie != null)
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    ciudad!['nombre'] ?? '',
+                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                  ),
+                  Text(
+                    serie!['nombre'] ?? '',
+                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                  ),
+                ],
+              ),
+          ],
+        ),
       ),
+
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20.0),

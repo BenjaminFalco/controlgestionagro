@@ -31,6 +31,6 @@
       applicationId="com.example.ensayotratamientoagro"
       generatedSourceFolders="build\generated\ap_generated_sources\release\out"
       generatedResourceFolders="build\generated\res\google-services\release;build\generated\res\resValues\release"
-      desugaredMethodsFiles="C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\c3498c720c6364371c9c883f47292bc4\transformed\D8BackportedDesugaredMethods.txt">
+      desugaredMethodsFiles="C:\Users\Patricio Arias\.gradle\caches\8.9\transforms\ca904e0b3ba973e1a784cab7c77a16a0\transformed\D8BackportedDesugaredMethods.txt">
   </artifact>
 </variant>

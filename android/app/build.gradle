@@ -16,10 +16,12 @@ android {
     defaultConfig {
         applicationId "com.example.ensayotratamientoagro"
         minSdkVersion 29         // Android 10 como mínimo para buen soporte
-        targetSdkVersion 35     // Android 13 (o superior si quieres compatibilidad futura)
+        targetSdkVersion 35 // Android 13 (o superior si quieres compatibilidad futura)
         compileSdkVersion 35
         versionCode 1
         versionName "1.0"
+
+        multiDexEnabled true
     }
 
     signingConfigs {

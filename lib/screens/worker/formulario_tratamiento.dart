@@ -276,6 +276,8 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             (_) => EvaluacionDanoScreen(
               parcelaRef: parcela.reference,
               totalRaices: totalRaices,
+              ciudadId: widget.ciudadId, // 👈 agregado
+              serieId: widget.serieId,
             ),
       ),
     );
@@ -310,7 +312,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              "T ${parcelas[currentIndex]['numero']} - BLOQUE ${nombresBloques[parcelas[currentIndex].reference.parent.parent!.id] ?? '...'}",
+              "T ${parcelas[currentIndex]['numero_tratamiento']} - BLOQUE ${nombresBloques[parcelas[currentIndex].reference.parent.parent!.id] ?? '...'}",
               style: const TextStyle(fontSize: 40, color: Colors.white),
             ),
 
@@ -345,10 +347,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     "N° Ficha: ${parcela['numero_ficha'] ?? '-'}",
                     style: const TextStyle(fontSize: 34, color: Colors.white),
                   ),
-                  Text(
-                    'N° TRATAMIENTO: ${parcela['numero_tratamiento'] ?? '-'}',
-                    style: const TextStyle(fontSize: 34, color: Colors.white),
-                  ),
+
                   Text(
                     "📅 $fechaActual",
                     style: const TextStyle(fontSize: 34, color: Colors.white),
@@ -424,111 +423,115 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // Botón QUINLEI alineado a la derecha, más pequeño
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        onPressed: irAEvaluacionDano,
-                        icon: const Icon(
-                          Icons.analytics_outlined,
-                          size: 44,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          "QUINLEI",
-                          style: TextStyle(fontSize: 48, color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueGrey,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 100,
-                            vertical: 20,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 20),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Botón SIGUIENTE
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              await guardarTratamientoActual();
 
-                    // Botón SIGUIENTE centrado, más grande
-                    Align(
-                      alignment: Alignment.center,
-                      child: ElevatedButton.icon(
-                        onPressed: () async {
-                          await guardarTratamientoActual();
+                              if (currentIndex < parcelas.length - 1) {
+                                setState(() => currentIndex++);
+                                await cargarTratamientoActual();
+                              } else {
+                                await guardarTratamientoActual();
 
-                          if (currentIndex < parcelas.length - 1) {
-                            setState(() => currentIndex++);
-                            await cargarTratamientoActual();
-                          } else {
-                            // Última parcela → guardar tratamiento y registrar fecha de cosecha en la serie
-                            await guardarTratamientoActual();
+                                final serieRef = FirebaseFirestore.instance
+                                    .collection('ciudades')
+                                    .doc(widget.ciudadId)
+                                    .collection('series')
+                                    .doc(widget.serieId);
 
-                            final serieRef = FirebaseFirestore.instance
-                                .collection('ciudades')
-                                .doc(widget.ciudadId)
-                                .collection('series')
-                                .doc(widget.serieId);
+                                await serieRef.update({
+                                  'fecha_cosecha': Timestamp.now(),
+                                });
 
-                            await serieRef.update({
-                              'fecha_cosecha': Timestamp.now(),
-                            });
-
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false,
-                              builder:
-                                  (context) => AlertDialog(
-                                    title: const Text(
-                                      "¡Tratamiento Finalizado!",
-                                    ),
-                                    content: const Text(
-                                      "Has terminado todas las parcelas de todos los bloques.",
-                                    ),
-                                    actions: [
-                                      TextButton(
-                                        onPressed: () {
-                                          Navigator.of(
-                                            context,
-                                          ).pushAndRemoveUntil(
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) =>
-                                                      const InicioTratamientoScreen(),
+                                showDialog(
+                                  context: context,
+                                  barrierDismissible: false,
+                                  builder:
+                                      (context) => AlertDialog(
+                                        title: const Text(
+                                          "¡Tratamiento Finalizado!",
+                                        ),
+                                        content: const Text(
+                                          "Has terminado todas las parcelas de todos los bloques.",
+                                        ),
+                                        actions: [
+                                          TextButton(
+                                            onPressed: () {
+                                              Navigator.of(
+                                                context,
+                                              ).pushAndRemoveUntil(
+                                                MaterialPageRoute(
+                                                  builder:
+                                                      (_) =>
+                                                          const InicioTratamientoScreen(),
+                                                ),
+                                                (route) => false,
+                                              );
+                                            },
+                                            child: const Text(
+                                              "Volver al inicio",
                                             ),
-                                            (route) => false,
-                                          );
-                                        },
-                                        child: const Text("Volver al inicio"),
+                                          ),
+                                        ],
                                       ),
-                                    ],
-                                  ),
-                            );
-                          }
-                        },
+                                );
+                              }
+                            },
+                            icon: const Icon(
+                              Icons.save_alt,
+                              size: 34,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              "SIGUIENTE ➡️",
+                              style: TextStyle(
+                                fontSize: 28,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 20,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                          ),
+                        ),
 
-                        icon: const Icon(
-                          Icons.save_alt,
-                          size: 34,
-                          color: Colors.white,
-                        ),
-                        label: const Text(
-                          "SIGUIENTE ➡️",
-                          style: TextStyle(fontSize: 60, color: Colors.white),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 100,
-                            vertical: 90,
+                        const SizedBox(width: 16), // Espacio entre los botones
+                        // Botón QUINLEI
+                        ElevatedButton.icon(
+                          onPressed: irAEvaluacionDano,
+                          icon: const Icon(
+                            Icons.analytics_outlined,
+                            size: 30,
+                            color: Colors.white,
                           ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(30),
+                          label: const Text(
+                            "QUINLEI",
+                            style: TextStyle(fontSize: 24, color: Colors.white),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.blueGrey,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 20,
+                              vertical: 20,
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
