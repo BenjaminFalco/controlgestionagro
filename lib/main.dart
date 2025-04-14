@@ -4,20 +4,41 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import 'firebase_options.dart';
 import 'screens/loading_screen.dart';
 import 'screens/login_screen.dart';
 import 'package:controlgestionagro/screens/worker/inicio_tratamiento.dart';
+
+/// 🔄 Escucha el estado de conexión para fines de depuración o sincronización
+void monitorConexion() {
+  Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
+    if (result == ConnectivityResult.none) {
+      debugPrint("🚫 Sin conexión, usando caché local");
+    } else {
+      debugPrint("✅ Conexión detectada, se sincronizarán los datos pendientes");
+      // TODO: aquí puedes llamar tu función para sincronizar datos Hive -> Firestore
+    }
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 🔹 Inicializa Firebase
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  FirebaseFirestore.instance.settings = const Settings(
+    persistenceEnabled: true,
+    cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
+  );
 
   // 🔹 Inicializa Hive para almacenamiento offline
   await Hive.initFlutter();
   await Hive.openBox('offline_data');
+
+  // 🔹 Monitorea la conexión
+  monitorConexion();
 
   runApp(const MyApp());
 }
@@ -36,7 +57,7 @@ class _MyAppState extends State<MyApp> {
   void initState() {
     super.initState();
 
-    // 🔄 Escucha cambios de conexión para futuras sincronizaciones
+    // 🔄 Escucha cambios de conexión para futuras sincronizaciones dentro de la app
     _connectivity.onConnectivityChanged.listen((result) {
       if (result != ConnectivityResult.none) {
         print("📶 Conexión disponible. Puedes sincronizar.");
@@ -71,7 +92,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-// 🔥 Verifica si el usuario está autenticado
+// 🔐 Verifica si el usuario está autenticado
 class AuthWrapper extends StatelessWidget {
   const AuthWrapper({super.key});
 
@@ -81,11 +102,11 @@ class AuthWrapper extends StatelessWidget {
       stream: FirebaseAuth.instance.authStateChanges(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const LoadingScreen(); // Pantalla de carga
+          return const LoadingScreen();
         } else if (snapshot.hasData) {
-          return const SetupScreen(); // Usuario autenticado -> Menú principal
+          return const SetupScreen();
         } else {
-          return const LoginScreen(); // Usuario no autenticado -> Login
+          return const LoginScreen();
         }
       },
     );

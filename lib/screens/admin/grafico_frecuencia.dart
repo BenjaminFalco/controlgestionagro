@@ -206,130 +206,174 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
     required DateTime? fechaCosecha,
     required BuildContext context,
   }) async {
-    final excel = Excel.createExcel();
-    final sheet = excel['DatosTratamiento'];
+    try {
+      final excel = Excel.createExcel();
+      final sheet = excel['DatosTratamiento'];
 
-    // Cabecera
-    sheet.appendRow([
-      'N° Ficha',
-      'Fecha Cosecha',
-      'Nombre Ensayo',
-      'Localidad',
-      'Sup. Cosechada (m²)',
-      'Bloque',
-      'N° Tratamiento',
-      'Suma N° raíces',
-      'Peso Raíces (kg)',
-      'Peso Hojas (kg)',
-      'NDVI',
-      'Observaciones',
-      '0',
-      '1',
-      '2',
-      '3',
-      '4',
-      '5',
-      '6',
-      '7',
-    ]);
+      // Cabecera
+      sheet.appendRow([
+        'N° Ficha',
+        'Fecha Cosecha',
+        'Nombre Ensayo',
+        'Localidad',
+        'Sup. Cosechada (m²)',
+        'Bloque',
+        'N° Tratamiento',
+        'Suma N° raíces',
+        'Peso Raíces (kg)',
+        'Peso Hojas (kg)',
+        'NDVI',
+        'Observaciones',
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        'Total',
+      ]);
 
-    // Recorrer bloques
-    final bloquesSnapshot =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(ciudadId)
-            .collection('series')
-            .doc(serieId)
-            .collection('bloques')
-            .get();
+      final bloquesSnapshot =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadId)
+              .collection('series')
+              .doc(serieId)
+              .collection('bloques')
+              .get();
 
-    for (final bloque in bloquesSnapshot.docs) {
-      final bloqueNombre = bloque['nombre'];
+      for (final bloque in bloquesSnapshot.docs) {
+        final bloqueNombre = bloque['nombre'];
 
-      final parcelasSnapshot =
-          await bloque.reference.collection('parcelas').orderBy('numero').get();
-
-      for (final parcela in parcelasSnapshot.docs) {
-        final numeroFicha = parcela['numero_ficha'] ?? '';
-        final numeroTratamiento = parcela['numero_tratamiento'] ?? '';
-
-        final tratamientosSnap =
-            await parcela.reference
-                .collection('tratamientos')
-                .doc('actual')
+        final parcelasSnapshot =
+            await bloque.reference
+                .collection('parcelas')
+                .orderBy('numero')
                 .get();
 
-        if (!tratamientosSnap.exists) continue;
-        final data = tratamientosSnap.data() ?? {};
+        for (final parcela in parcelasSnapshot.docs) {
+          final numeroFicha = parcela['numero_ficha'] ?? '';
+          final numeroTratamiento = parcela['numero_tratamiento'] ?? '';
 
-        final raicesA = int.tryParse(data['raicesA'] ?? '0') ?? 0;
-        final raicesB = int.tryParse(data['raicesB'] ?? '0') ?? 0;
-        final totalRaices = raicesA + raicesB;
+          final tratamientosSnap =
+              await parcela.reference
+                  .collection('tratamientos')
+                  .doc('actual')
+                  .get();
 
-        final pesoRaices =
-            (double.tryParse(data['pesoA'] ?? '0') ?? 0) +
-            (double.tryParse(data['pesoB'] ?? '0') ?? 0);
+          if (!tratamientosSnap.exists) continue;
+          final data = tratamientosSnap.data() ?? {};
 
-        final pesoHojas = data['pesoHojas'] ?? '';
-        final ndvi = data['ndvi'] ?? '';
-        final observaciones = data['observaciones'] ?? '';
+          final raicesA = int.tryParse(data['raicesA'] ?? '0') ?? 0;
+          final raicesB = int.tryParse(data['raicesB'] ?? '0') ?? 0;
+          final totalRaices = raicesA + raicesB;
 
-        // Obtener frecuencia por categoría 0-7
-        final frecuenciaSnap =
-            await parcela.reference
-                .collection('tratamientos')
-                .doc('frecuencia')
-                .get();
+          final pesoRaices =
+              (double.tryParse(data['pesoA'] ?? '0') ?? 0) +
+              (double.tryParse(data['pesoB'] ?? '0') ?? 0);
 
-        Map<String, dynamic> frecuencias = frecuenciaSnap.data() ?? {};
-        List<int> quinlei = List.generate(
-          8,
-          (i) => frecuencias[i.toString()] ?? 0,
+          final pesoHojas = data['pesoHojas'] ?? '';
+          final ndvi = data['ndvi'] ?? '';
+          final observaciones = data['observaciones'] ?? '';
+
+          final frecuenciaSnap =
+              await parcela.reference
+                  .collection('tratamientos')
+                  .doc('frecuencia')
+                  .get();
+
+          Map<String, dynamic> frecuencias = frecuenciaSnap.data() ?? {};
+          List<int> quinlei = List.generate(8, (i) => frecuencias['$i'] ?? 0);
+          final totalEvaluadas = quinlei.fold(0, (sum, val) => sum + val);
+
+          sheet.appendRow([
+            numeroFicha,
+            fechaCosecha != null
+                ? DateFormat('yyyy-MM-dd').format(fechaCosecha)
+                : '',
+            nombreSerie,
+            nombreCiudad,
+            "10",
+            bloqueNombre,
+            numeroTratamiento,
+            totalRaices,
+            pesoRaices,
+            pesoHojas,
+            ndvi,
+            observaciones,
+            ...quinlei,
+            totalEvaluadas,
+          ]);
+        }
+      }
+
+      final nombreArchivo =
+          "${nombreCiudad}_${nombreSerie}_${DateFormat('yyyyMMdd').format(fechaCosecha ?? DateTime.now())}"
+              .replaceAll(" ", "_")
+              .replaceAll("/", "-");
+
+      // ✅ Ruta multiplataforma
+      Directory outputDir;
+      if (Platform.isAndroid) {
+        outputDir = Directory('/storage/emulated/0/Download');
+      } else if (Platform.isWindows) {
+        outputDir = await getApplicationDocumentsDirectory();
+      } else {
+        outputDir = await getTemporaryDirectory();
+      }
+
+      final filePath = "${outputDir.path}/$nombreArchivo.xlsx";
+      final file = File(filePath);
+      final bytes = excel.encode();
+      await file.writeAsBytes(bytes!);
+
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (_) => AlertDialog(
+                title: const Text("✅ Exportación exitosa"),
+                content: SelectableText(
+                  "El archivo fue guardado correctamente en:\n\n$filePath",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Share.shareFiles([
+                        filePath,
+                      ], text: "📄 Tratamiento exportado");
+                    },
+                    child: const Text("Compartir"),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Aceptar"),
+                  ),
+                ],
+              ),
         );
-
-        sheet.appendRow([
-          numeroFicha,
-          fechaCosecha != null
-              ? DateFormat('yyyy-MM-dd').format(fechaCosecha)
-              : '',
-          nombreSerie,
-          nombreCiudad,
-          "10", // Sup. cosechada
-          bloqueNombre,
-          numeroTratamiento,
-          totalRaices,
-          pesoRaices,
-          pesoHojas,
-          ndvi,
-          observaciones,
-          ...quinlei,
-        ]);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        showDialog(
+          context: context,
+          builder:
+              (_) => AlertDialog(
+                title: const Text("❌ Error en la exportación"),
+                content: Text("Error:\n\n$e"),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Cerrar"),
+                  ),
+                ],
+              ),
+        );
       }
     }
-
-    final bytes = excel.encode();
-    final dir = await getApplicationDocumentsDirectory();
-    final path = "${dir.path}/tratamientos_export.xlsx";
-    final file = File(path)..writeAsBytesSync(bytes!);
-
-    showDialog(
-      context: context,
-      builder:
-          (_) => AlertDialog(
-            title: const Text("✅ Exportación exitosa"),
-            content: Text(
-              "El archivo Excel ha sido exportado correctamente a:\n\n$path",
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text("Aceptar"),
-              ),
-            ],
-          ),
-    );
-
-    Share.shareFiles([file.path], text: "Tratamiento exportado (Excel)");
   }
 
   Future<void> exportarPDF() async {
@@ -451,7 +495,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        title: const Text("Gráfico Frecuencia Acumulada"),
+        title: const Text("Panel de datos"),
         backgroundColor: Colors.green.shade700,
         foregroundColor: Colors.white,
       ),
@@ -516,71 +560,82 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                     )
                   else
                     Expanded(
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: DataTable(
-                          headingRowColor: MaterialStateProperty.all(
-                            Color(0xFFE0E0E0),
+                      child: Scrollbar(
+                        thumbVisibility: true,
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.vertical,
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: DataTable(
+                              columnSpacing: 16,
+                              headingRowColor: MaterialStateProperty.all(
+                                const Color(0xFFE0E0E0),
+                              ),
+                              columns: const [
+                                DataColumn(label: Text("N° Ficha")),
+                                DataColumn(label: Text("Fecha Creación")),
+                                DataColumn(label: Text("Nombre Ensayo")),
+                                DataColumn(label: Text("Localidad")),
+                                DataColumn(label: Text("Superficie")),
+                                DataColumn(label: Text("Bloque")),
+                                DataColumn(label: Text("N° Tratamiento")),
+                                DataColumn(label: Text("Peso Raíces (kg)")),
+                                DataColumn(label: Text("Peso Hojas (kg)")),
+                                DataColumn(label: Text("NDVI")),
+                                DataColumn(label: Text("Observaciones")),
+                                DataColumn(label: Text("0")),
+                                DataColumn(label: Text("1")),
+                                DataColumn(label: Text("2")),
+                                DataColumn(label: Text("3")),
+                                DataColumn(label: Text("4")),
+                                DataColumn(label: Text("5")),
+                                DataColumn(label: Text("6")),
+                                DataColumn(label: Text("7")),
+                                DataColumn(label: Text("Total")),
+                              ],
+                              rows:
+                                  todasLasParcelas.map((p) {
+                                    return DataRow(
+                                      cells: [
+                                        DataCell(
+                                          Text(p.numeroFicha.toString()),
+                                        ),
+                                        DataCell(
+                                          Text(
+                                            p.fechaCosecha != null
+                                                ? DateFormat(
+                                                  'yyyy-MM-dd',
+                                                ).format(p.fechaCosecha!)
+                                                : '',
+                                          ),
+                                        ),
+                                        DataCell(Text(p.nombreSerie)),
+                                        DataCell(Text(p.nombreCiudad)),
+                                        DataCell(Text(p.superficie ?? '')),
+                                        DataCell(Text(p.nombreBloque)),
+                                        DataCell(
+                                          Text(p.numeroTratamiento.toString()),
+                                        ),
+                                        DataCell(
+                                          Text(p.pesoRaices.toStringAsFixed(2)),
+                                        ),
+                                        DataCell(Text(p.pesoHojas)),
+                                        DataCell(Text(p.ndvi)),
+                                        DataCell(Text(p.observaciones)),
+                                        for (int i = 0; i <= 7; i++)
+                                          DataCell(
+                                            Text(
+                                              p.frecuenciaNotas[i].toString(),
+                                            ),
+                                          ),
+                                        DataCell(
+                                          Text(p.totalEvaluadas.toString()),
+                                        ),
+                                      ],
+                                    );
+                                  }).toList(),
+                            ),
                           ),
-                          columns: const [
-                            DataColumn(label: Text("N° Ficha")),
-                            DataColumn(label: Text("Fecha Creación")),
-                            DataColumn(label: Text("Nombre Ensayo")),
-                            DataColumn(label: Text("Localidad")),
-                            DataColumn(label: Text("Superficie")),
-                            DataColumn(label: Text("Bloque")),
-                            DataColumn(label: Text("N° Tratamiento")),
-                            DataColumn(label: Text("Peso Raíces (kg)")),
-                            DataColumn(label: Text("Peso Hojas (kg)")),
-                            DataColumn(label: Text("NDVI")),
-                            DataColumn(label: Text("Observaciones")),
-                            DataColumn(label: Text("0")),
-                            DataColumn(label: Text("1")),
-                            DataColumn(label: Text("2")),
-                            DataColumn(label: Text("3")),
-                            DataColumn(label: Text("4")),
-                            DataColumn(label: Text("5")),
-                            DataColumn(label: Text("6")),
-                            DataColumn(label: Text("7")),
-                            DataColumn(label: Text("Total")),
-                          ],
-                          rows:
-                              todasLasParcelas.map((p) {
-                                return DataRow(
-                                  cells: [
-                                    DataCell(Text(p.numeroFicha.toString())),
-                                    DataCell(
-                                      Text(
-                                        p.fechaCosecha != null
-                                            ? DateFormat(
-                                              'yyyy-MM-dd',
-                                            ).format(p.fechaCosecha!)
-                                            : '',
-                                      ),
-                                    ),
-                                    DataCell(Text(p.nombreSerie)),
-                                    DataCell(Text(p.nombreCiudad)),
-                                    DataCell(Text(p.superficie ?? '')),
-                                    DataCell(Text(p.nombreBloque)),
-                                    DataCell(
-                                      Text(p.numeroTratamiento.toString()),
-                                    ),
-                                    DataCell(
-                                      Text(p.pesoRaices.toStringAsFixed(2)),
-                                    ),
-                                    DataCell(Text(p.pesoHojas)),
-                                    DataCell(Text(p.ndvi)),
-                                    DataCell(Text(p.observaciones)),
-                                    for (int i = 0; i <= 7; i++)
-                                      DataCell(
-                                        Text(p.frecuenciaNotas[i].toString()),
-                                      ),
-                                    DataCell(
-                                      Text(p.totalEvaluadas.toString()),
-                                    ), // 👈 NUEVO
-                                  ],
-                                );
-                              }).toList(),
                         ),
                       ),
                     ),

@@ -11,6 +11,22 @@ class CrearCiudad extends StatefulWidget {
 class _CrearCiudadState extends State<CrearCiudad> {
   final TextEditingController ciudadController = TextEditingController();
   String mensaje = '';
+  List<DocumentSnapshot> ciudades = [];
+  DocumentSnapshot? ciudadSeleccionada;
+
+  @override
+  void initState() {
+    super.initState();
+    cargarCiudades();
+  }
+
+  Future<void> cargarCiudades() async {
+    final snapshot =
+        await FirebaseFirestore.instance.collection('ciudades').get();
+    setState(() {
+      ciudades = snapshot.docs;
+    });
+  }
 
   Future<void> guardarCiudad() async {
     final nombreCiudad = ciudadController.text.trim();
@@ -32,6 +48,8 @@ class _CrearCiudadState extends State<CrearCiudad> {
         mensaje = "✅ Localidad '$nombreCiudad' creada exitosamente.";
         ciudadController.clear();
       });
+
+      cargarCiudades(); // Recargar la lista
     } catch (e) {
       setState(() {
         mensaje = "❌ Error al crear localidad: ${e.toString()}";
@@ -39,12 +57,73 @@ class _CrearCiudadState extends State<CrearCiudad> {
     }
   }
 
+  void mostrarModalEliminarCiudad() {
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text("Eliminar Localidad"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Selecciona una localidad para eliminar:"),
+                const SizedBox(height: 10),
+                DropdownButton<DocumentSnapshot>(
+                  isExpanded: true,
+                  value: ciudadSeleccionada,
+                  hint: const Text("Seleccionar..."),
+                  items:
+                      ciudades.map((doc) {
+                        return DropdownMenuItem(
+                          value: doc,
+                          child: Text(doc['nombre']),
+                        );
+                      }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      ciudadSeleccionada = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (ciudadSeleccionada != null) {
+                    await FirebaseFirestore.instance
+                        .collection('ciudades')
+                        .doc(ciudadSeleccionada!.id)
+                        .delete();
+
+                    setState(() {
+                      mensaje =
+                          "✅ Localidad '${ciudadSeleccionada!['nombre']}' eliminada.";
+                      ciudadSeleccionada = null;
+                    });
+
+                    Navigator.pop(context);
+                    cargarCiudades();
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text("Eliminar"),
+              ),
+            ],
+          ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF005A56), // Azul petróleo IANSA
+        backgroundColor: const Color(0xFF005A56),
         centerTitle: true,
         elevation: 0,
         title: const Text(
@@ -103,7 +182,7 @@ class _CrearCiudadState extends State<CrearCiudad> {
                 ElevatedButton(
                   onPressed: guardarCiudad,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B140), // Verde IANSA
+                    backgroundColor: const Color(0xFF00B140),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     textStyle: const TextStyle(fontSize: 18),
@@ -112,6 +191,18 @@ class _CrearCiudadState extends State<CrearCiudad> {
                     ),
                   ),
                   child: const Text("Guardar Localidad"),
+                ),
+                const SizedBox(height: 12),
+                ElevatedButton.icon(
+                  onPressed: mostrarModalEliminarCiudad,
+                  icon: const Icon(Icons.delete),
+                  label: const Text("Eliminar Localidad"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
                 ),
                 const SizedBox(height: 20),
                 if (mensaje.isNotEmpty)

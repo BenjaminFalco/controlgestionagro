@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.example.ensayotratamientoagro.app-mergeReleaseResources-54:/values-sw360dp-v13/values-sw360dp-v13.xml",
+            "outputFile": "com.example.controlgestionagro.app-mergeReleaseResources-53:/values-sw360dp-v13/values-sw360dp-v13.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\Patricio Arias\\.gradle\\caches\\8.9\\transforms\\0a5fbd956ba22cde029caebab7cfc626\\transformed\\preference-1.2.1\\res\\values-sw360dp-v13\\values-sw360dp-v13.xml",
+                    "source": "C:\\Users\\Patricio Arias\\.gradle\\caches\\8.10.2\\transforms\\0098a6e93522fecc805d8900172003dc\\transformed\\preference-1.2.1\\res\\values-sw360dp-v13\\values-sw360dp-v13.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

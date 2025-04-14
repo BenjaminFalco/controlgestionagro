@@ -19,6 +19,9 @@ class _CrearSerieState extends State<CrearSerie> {
   String? ciudadSeleccionada;
   List<QueryDocumentSnapshot> ciudades = [];
 
+  DocumentSnapshot? serieSeleccionada;
+  List<DocumentSnapshot> seriesEnCiudad = [];
+
   bool usarSerieExistente = false;
   String? ciudadReferencia;
   String? serieReferencia;
@@ -36,6 +39,80 @@ class _CrearSerieState extends State<CrearSerie> {
     setState(() {
       ciudades = snapshot.docs;
     });
+  }
+
+  void mostrarModalEliminarSerie() {
+    showDialog(
+      context: context,
+      builder:
+          (_) => AlertDialog(
+            title: const Text("Eliminar Ensayo"),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text("Selecciona un ensayo para eliminar:"),
+                const SizedBox(height: 10),
+                DropdownButton<DocumentSnapshot>(
+                  isExpanded: true,
+                  value: serieSeleccionada,
+                  hint: const Text("Seleccionar..."),
+                  items:
+                      seriesEnCiudad.map((doc) {
+                        return DropdownMenuItem(
+                          value: doc,
+                          child: Text(doc['nombre']),
+                        );
+                      }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      serieSeleccionada = value;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Cancelar"),
+              ),
+              ElevatedButton(
+                onPressed: () async {
+                  if (ciudadSeleccionada != null && serieSeleccionada != null) {
+                    await FirebaseFirestore.instance
+                        .collection('ciudades')
+                        .doc(ciudadSeleccionada!)
+                        .collection('series')
+                        .doc(serieSeleccionada!.id)
+                        .delete();
+
+                    setState(() {
+                      mensaje =
+                          "✅ Ensayo '${serieSeleccionada!['nombre']}' eliminado.";
+                      serieSeleccionada = null;
+                    });
+
+                    Navigator.pop(context);
+
+                    // Recargar lista de series
+                    final snap =
+                        await FirebaseFirestore.instance
+                            .collection('ciudades')
+                            .doc(ciudadSeleccionada!)
+                            .collection('series')
+                            .get();
+
+                    setState(() {
+                      seriesEnCiudad = snap.docs;
+                    });
+                  }
+                },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                child: const Text("Eliminar"),
+              ),
+            ],
+          ),
+    );
   }
 
   Future<void> copiarNumeroTratamientoDesdeSerie(
@@ -245,8 +322,27 @@ class _CrearSerieState extends State<CrearSerie> {
               children: [
                 DropdownButtonFormField<String>(
                   value: ciudadSeleccionada,
-                  onChanged:
-                      (value) => setState(() => ciudadSeleccionada = value),
+                  onChanged: (value) async {
+                    setState(() {
+                      ciudadSeleccionada = value;
+                      serieSeleccionada = null;
+                      seriesEnCiudad = [];
+                    });
+
+                    if (value != null) {
+                      final snap =
+                          await FirebaseFirestore.instance
+                              .collection('ciudades')
+                              .doc(value)
+                              .collection('series')
+                              .get();
+
+                      setState(() {
+                        seriesEnCiudad = snap.docs;
+                      });
+                    }
+                  },
+
                   items:
                       ciudades.map((doc) {
                         return DropdownMenuItem<String>(
@@ -363,6 +459,22 @@ class _CrearSerieState extends State<CrearSerie> {
                   child: const Text("Crear Serie"),
                 ),
                 const SizedBox(height: 16),
+                ElevatedButton.icon(
+                  onPressed:
+                      ciudadSeleccionada == null
+                          ? null
+                          : mostrarModalEliminarSerie,
+                  icon: const Icon(Icons.delete),
+                  label: const Text("Eliminar Ensayo"),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    textStyle: const TextStyle(fontSize: 16),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
                 if (mensaje.isNotEmpty)
                   Text(
                     mensaje,

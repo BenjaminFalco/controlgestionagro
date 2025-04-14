@@ -119,72 +119,6 @@ class _CrearParcelasState extends State<CrearParcelas> {
     }
   }
 
-  Future<void> crearBloquesYParcelas() async {
-    if (ciudadSeleccionada == null || serieSeleccionada == null) {
-      setState(() => mensaje = "⚠️ Selecciona ciudad y serie.");
-      return;
-    }
-
-    if (parcelasPorBloque.isNotEmpty) {
-      setState(
-        () => mensaje = "⚠️ Ya existen parcelas. No puedes volver a crear.",
-      );
-      return;
-    }
-
-    try {
-      final serieDoc =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada!)
-              .collection('series')
-              .doc(serieSeleccionada!)
-              .get();
-
-      cantidadParcelas = serieDoc['matriz_largo'];
-      cantidadBloques = serieDoc['matriz_alto'];
-
-      final serieRef = FirebaseFirestore.instance
-          .collection('ciudades')
-          .doc(ciudadSeleccionada!)
-          .collection('series')
-          .doc(serieSeleccionada!);
-
-      for (int i = 0; i < cantidadBloques; i++) {
-        String bloque = String.fromCharCode(65 + i); // A, B, C...
-        final bloqueRef = serieRef.collection('bloques').doc(bloque);
-        final bloqueSnap = await bloqueRef.get();
-
-        if (!bloqueSnap.exists) {
-          await bloqueRef.set({"nombre": bloque}, SetOptions(merge: true));
-        }
-
-        for (int j = 1; j <= cantidadParcelas; j++) {
-          final parcelaRef = bloqueRef.collection('parcelas').doc(j.toString());
-          final parcelaSnap = await parcelaRef.get();
-
-          if (!parcelaSnap.exists) {
-            await parcelaRef.set({
-              "numero": j,
-              "numero_ficha": null,
-              "numero_tratamiento": null,
-              "tratamiento": true,
-              "trabajador_id": null,
-              "total_raices": null,
-              "evaluacion": null,
-              "frecuencia_relativa": null,
-            });
-          }
-        }
-      }
-
-      setState(() => mensaje = "✅ Parcelas generadas correctamente.");
-      await cargarMatrizCompleta();
-    } catch (e) {
-      setState(() => mensaje = "❌ Error al crear parcelas: ${e.toString()}");
-    }
-  }
-
   Future<void> cargarNumerosDesdeSerieAnterior(
     String ciudadId,
     String serieId,
@@ -416,18 +350,6 @@ class _CrearParcelasState extends State<CrearParcelas> {
             const SizedBox(height: 20),
             Row(
               children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: crearBloquesYParcelas,
-                    icon: const Icon(Icons.add_box),
-                    label: const Text("Crear bloques y parcelas"),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF00B140),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                    ),
-                  ),
-                ),
                 const SizedBox(width: 10),
 
                 ElevatedButton.icon(
