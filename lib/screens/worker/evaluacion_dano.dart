@@ -345,7 +345,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
           children: [
             Text(
               "T ${parcelaData?['numero_tratamiento'] ?? ''} - BLOQUE ${nombresBloques[widget.parcelaRef.parent.parent!.id] ?? ''}",
-              style: const TextStyle(fontSize: 40, color: Colors.white),
+              style: const TextStyle(fontSize: 20, color: Colors.white),
             ),
             if (ciudad != null && serie != null)
               Column(
@@ -353,11 +353,11 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                 children: [
                   Text(
                     ciudad!['nombre'] ?? '',
-                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                    style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                   Text(
                     serie!['nombre'] ?? '',
-                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                    style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ],
               ),
@@ -372,7 +372,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
             children: [
               Text(
                 "Raíces a evaluar: ${widget.totalRaices}",
-                style: const TextStyle(color: Colors.white, fontSize: 30),
+                style: const TextStyle(color: Colors.white, fontSize: 25),
               ),
 
               if (completado)
@@ -385,91 +385,116 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Text(
-                      "✅ Evaluación completa. No puedes ingresar más datos.",
-                      style: TextStyle(color: Colors.white, fontSize: 16),
+                      "✅ Evaluación completa",
+                      style: TextStyle(color: Colors.white, fontSize: 8),
                     ),
                   ),
                 ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 16),
 
               GridView.count(
                 shrinkWrap: true,
-                crossAxisCount: 4,
-                mainAxisSpacing: 10,
-                crossAxisSpacing: 10,
+                crossAxisCount: 3,
+                mainAxisSpacing: 16,
+                crossAxisSpacing: 16,
                 childAspectRatio: 1.1,
                 physics: const NeverScrollableScrollPhysics(),
-                children: List.generate(8, (index) {
-                  final cantidad = evaluaciones[index] ?? 0;
-                  return GestureDetector(
-                    onTap:
-                        completado
-                            ? null
-                            : () async {
-                              setState(() {
-                                evaluaciones[index] =
-                                    (evaluaciones[index] ?? 0) + 1;
-                                historialEvaluaciones.add(index);
-                              });
+                children: List.generate(9, (index) {
+                  if (index < 8) {
+                    final cantidad = evaluaciones[index] ?? 0;
+                    return GestureDetector(
+                      onTap:
+                          completado
+                              ? null
+                              : () async {
+                                setState(() {
+                                  evaluaciones[index] =
+                                      (evaluaciones[index] ?? 0) + 1;
+                                  historialEvaluaciones.add(index);
+                                });
 
-                              await player.play(AssetSource('sounds/beep.mp3'));
-                            },
-                    child: Stack(
-                      children: [
-                        // Fondo del botón
-                        Container(
-                          decoration: BoxDecoration(
-                            color:
-                                completado
-                                    ? Colors.grey.shade800
-                                    : const Color.fromARGB(255, 0, 0, 0),
-                            border: Border.all(color: Colors.white, width: 2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            "$index",
-                            style: const TextStyle(
-                              fontSize: 80,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-
-                        // Contador amarillo al fondo, pegado al borde inferior
-                        Positioned(
-                          left: 0,
-                          right: 0,
-                          bottom: 0,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 4),
+                                await player.play(
+                                  AssetSource('sounds/beep.mp3'),
+                                );
+                              },
+                      child: Stack(
+                        children: [
+                          Container(
                             decoration: BoxDecoration(
-                              color: Colors.yellow.shade700,
-                              borderRadius: const BorderRadius.only(
-                                bottomLeft: Radius.circular(10),
-                                bottomRight: Radius.circular(10),
+                              color:
+                                  completado
+                                      ? Colors.grey.shade800
+                                      : Colors.black,
+                              border: Border.all(color: Colors.white, width: 2),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            alignment: Alignment.topCenter,
+                            child: Text(
+                              "$index",
+                              style: const TextStyle(
+                                fontSize: 48,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
                               ),
                             ),
-                            child: Center(
-                              child: Text(
-                                "$cantidad",
-                                style: const TextStyle(
-                                  fontSize: 28,
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
+                          ),
+                          Positioned(
+                            left: 0,
+                            right: 0,
+                            bottom: 0,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 2),
+                              decoration: BoxDecoration(
+                                color: Colors.yellow.shade700,
+                                borderRadius: const BorderRadius.only(
+                                  bottomLeft: Radius.circular(10),
+                                  bottomRight: Radius.circular(10),
+                                ),
+                              ),
+                              child: Center(
+                                child: Text(
+                                  "$cantidad",
+                                  style: const TextStyle(
+                                    fontSize: 20,
+                                    color: Colors.black,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             ),
                           ),
+                        ],
+                      ),
+                    );
+                  } else {
+                    // 🔽 Botón GUARDAR en la última celda (posición 8)
+                    return SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton.icon(
+                        onPressed: guardarEvaluacion,
+                        icon: const Icon(Icons.save),
+                        label: const Text(
+                          "Guardar",
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ],
-                    ),
-                  );
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF04bc04),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                        ),
+                      ),
+                    );
+                  }
                 }),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 4),
 
               Container(
                 padding: const EdgeInsets.symmetric(
@@ -477,37 +502,16 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                   horizontal: 40,
                 ),
                 child: Text(
-                  "Total Raíces: $totalRaices ",
+                  "N° Raíces: $totalRaices ",
                   style: const TextStyle(
                     color: Colors.white,
-                    fontSize: 30,
+                    fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 4),
 
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: guardarEvaluacion,
-                  icon: const Icon(Icons.save),
-                  label: const Text(
-                    "Guardar evaluación",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF04bc04),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                  ),
-                ),
-              ),
-
-              const SizedBox(height: 24),
               const Divider(color: Colors.white38),
 
               Text(
@@ -533,8 +537,6 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                               final nota = entry.key;
                               final cantidad = entry.value;
                               final porcentaje = cantidad / widget.totalRaices;
-                              final porcentajeTexto = (porcentaje * 100)
-                                  .toStringAsFixed(1);
 
                               return PieChartSectionData(
                                 value: porcentaje,
@@ -542,7 +544,7 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
                                     Colors.primaries[nota %
                                         Colors.primaries.length],
                                 radius: 60,
-                                title: "$nota\n$porcentajeTexto%",
+                                title: "$nota",
                                 titleStyle: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 12,

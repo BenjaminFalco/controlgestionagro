@@ -318,11 +318,11 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         centerTitle: true,
-        toolbarHeight: 120,
+        toolbarHeight: 70,
         title: const Text(
           "POSICIONAR TERRENO",
           style: TextStyle(
-            fontSize: 37,
+            fontSize: 30,
             fontWeight: FontWeight.bold,
             color: Colors.black,
           ),
@@ -370,7 +370,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                       doc['nombre'],
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 25,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -404,7 +404,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                       doc['nombre'],
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 24,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -440,7 +440,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                       "Bloque $b",
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 24,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -467,10 +467,10 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   return DropdownMenuItem(
                                     value: doc.id,
                                     child: Text(
-                                      "Tratamiento ${doc['numero_tratamiento']}",
+                                      "T ${doc['numero_tratamiento']}",
                                       style: const TextStyle(
                                         color: Colors.white,
-                                        fontSize: 24,
+                                        fontSize: 15,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
@@ -492,83 +492,18 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           controller: superficieController,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 24,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                           ),
                           decoration: const InputDecoration(
                             hintText: "Superficie cosechable (m²)",
                             hintStyle: TextStyle(
                               color: Colors.white70,
-                              fontSize: 22,
+                              fontSize: 15,
                             ),
                             border: InputBorder.none,
                           ),
                         ),
-                      ),
-                      const SizedBox(height: 24),
-                      SizedBox(
-                        height: 250,
-                        child:
-                            parcelas.isEmpty
-                                ? const Center(
-                                  child: Text(
-                                    "No hay parcelas cargadas.",
-                                    style: TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                )
-                                : ListView.builder(
-                                  itemCount: parcelas.length,
-                                  itemBuilder: (context, index) {
-                                    final doc = parcelas[index];
-                                    return Card(
-                                      color: Colors.black,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                        side: const BorderSide(
-                                          color: Colors.white,
-                                          width: 3,
-                                        ),
-                                      ),
-                                      child: ListTile(
-                                        title: Text(
-                                          "Posición ${doc['numero']}",
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 22,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        trailing: const Icon(
-                                          Icons.arrow_forward_ios,
-                                          color: Colors.white,
-                                        ),
-                                        onTap: () {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder:
-                                                  (_) => FormularioTratamiento(
-                                                    ciudadId:
-                                                        ciudadSeleccionada!,
-                                                    serieId: serieSeleccionada!,
-                                                    bloqueId:
-                                                        bloqueSeleccionado!,
-                                                    parcelaDesde: doc['numero'],
-                                                    numeroFicha: numeroFicha,
-                                                    numeroTratamiento:
-                                                        numeroTratamiento,
-                                                  ),
-                                            ),
-                                          );
-                                        },
-                                      ),
-                                    );
-                                  },
-                                ),
                       ),
 
                       FutureBuilder<bool>(
@@ -585,7 +520,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                 SizedBox(
                                   width:
                                       MediaQuery.of(context).size.width * 0.85,
-                                  height: 80,
+                                  height: 50,
                                   child: ElevatedButton.icon(
                                     onPressed: mostrarModalGenerarFicha,
                                     icon: const Icon(
@@ -608,7 +543,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 40),
+                                const SizedBox(height: 20),
                               ],
                             );
                           }
@@ -617,10 +552,10 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                         },
                       ),
 
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 20),
                       SizedBox(
                         width: MediaQuery.of(context).size.width * 0.85,
-                        height: 80,
+                        height: 50,
                         child: ElevatedButton.icon(
                           onPressed:
                               parcelaSeleccionada != null
@@ -660,7 +595,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           label: const Text(
                             "INICIAR TOMA DE DATOS",
                             style: TextStyle(
-                              fontSize: 26,
+                              fontSize: 16,
                               fontWeight: FontWeight.bold,
                             ),
                           ),
@@ -702,7 +637,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
         labelText: label,
         labelStyle: const TextStyle(
           color: Colors.white,
-          fontSize: 22,
+          fontSize: 15,
           fontWeight: FontWeight.bold,
         ),
         filled: true,

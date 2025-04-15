@@ -456,7 +456,7 @@ class _CrearSerieState extends State<CrearSerie> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  child: const Text("Crear Serie"),
+                  child: const Text("Crear Matriz"),
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(

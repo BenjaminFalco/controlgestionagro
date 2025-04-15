@@ -173,7 +173,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             isScrollControlled: true,
             builder: (_) {
               return Padding(
-                padding: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(4),
                 child:
                     label == "NDVI"
                         ? CustomNDVIPad(
@@ -210,24 +210,24 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             maxLines: maxLines,
             keyboardType: isNumeric ? TextInputType.none : TextInputType.text,
             style: const TextStyle(
-              fontSize: 80,
+              fontSize: 20,
               color: Colors.white,
               fontWeight: FontWeight.bold,
             ),
             decoration: InputDecoration(
               labelText: label,
-              labelStyle: const TextStyle(fontSize: 50, color: Colors.white),
+              labelStyle: const TextStyle(fontSize: 20, color: Colors.white),
               filled: true,
               fillColor: Colors.black,
               contentPadding: const EdgeInsets.symmetric(
-                vertical: 51,
-                horizontal: 30,
+                vertical: 20,
+                horizontal: 25,
               ),
               enabledBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.white, width: 10),
+                borderSide: BorderSide(color: Colors.white, width: 5),
               ),
               focusedBorder: const OutlineInputBorder(
-                borderSide: BorderSide(color: Colors.cyanAccent, width: 10),
+                borderSide: BorderSide(color: Colors.cyanAccent, width: 5),
               ),
             ),
           ),
@@ -246,7 +246,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     return Row(
       children: [
         Expanded(child: _buildInput(label1, controller1, isNumeric: isNumeric)),
-        const SizedBox(width: 20),
+        const SizedBox(width: 15),
         Expanded(child: _buildInput(label2, controller2, isNumeric: isNumeric)),
       ],
     );
@@ -313,7 +313,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
           children: [
             Text(
               "T ${parcelas[currentIndex]['numero_tratamiento']} - BLOQUE ${nombresBloques[parcelas[currentIndex].reference.parent.parent!.id] ?? '...'}",
-              style: const TextStyle(fontSize: 40, color: Colors.white),
+              style: const TextStyle(fontSize: 20, color: Colors.white),
             ),
 
             if (ciudad != null && serie != null)
@@ -322,11 +322,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 children: [
                   Text(
                     ciudad!['nombre'],
-                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                    style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                   Text(
                     serie!['nombre'],
-                    style: const TextStyle(fontSize: 26, color: Colors.white),
+                    style: const TextStyle(fontSize: 16, color: Colors.white),
                   ),
                 ],
               ),
@@ -340,21 +340,29 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     "N° Ficha: ${parcela['numero_ficha'] ?? '-'}",
-                    style: const TextStyle(fontSize: 34, color: Colors.white),
+                    style: const TextStyle(
+                      fontSize: 20,
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-
+                  const SizedBox(height: 2),
                   Text(
-                    "📅 $fechaActual",
-                    style: const TextStyle(fontSize: 34, color: Colors.white),
+                    fechaActual,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.white70,
+                      fontStyle: FontStyle.italic,
+                    ),
                   ),
                 ],
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 15),
 
               _buildInputPair(
                 "N° Raíces 1",
@@ -370,24 +378,17 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 pesoBController,
                 isNumeric: true,
               ),
-              _buildInput(
+              _buildInputPair(
                 "Peso hojas (kg)",
                 pesoHojasController,
+                "NDVI",
+                ndviController,
                 isNumeric: true,
               ),
-              _buildInput("NDVI", ndviController, isNumeric: true),
-              _buildInput(
-                "Observaciones",
-                observacionesController,
-                maxLines: 3,
-              ),
-
-              const SizedBox(height: 40),
-
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: const EdgeInsets.all(15),
                 decoration: BoxDecoration(
-                  border: Border.all(color: Colors.white, width: 4),
+                  border: Border.all(color: Colors.white, width: 1),
                   borderRadius: BorderRadius.circular(16),
                 ),
                 child: Column(
@@ -396,7 +397,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     Text(
                       "TOTAL RAÍCES: $totalRaices",
                       style: const TextStyle(
-                        fontSize: 80,
+                        fontSize: 16,
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -405,7 +406,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     Text(
                       "TOTAL PESO RAÍCES: ${pesoTotal.toStringAsFixed(2)} kg",
                       style: const TextStyle(
-                        fontSize: 80,
+                        fontSize: 16,
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
                       ),
@@ -413,12 +414,10 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                   ],
                 ),
               ),
-              const SizedBox(height: 30),
-
               Padding(
                 padding: const EdgeInsets.symmetric(
-                  vertical: 24.0,
-                  horizontal: 16,
+                  vertical: 12.0,
+                  horizontal: 10,
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -490,44 +489,19 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                             label: const Text(
                               "SIGUIENTE ➡️",
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 15,
                                 color: Colors.white,
                               ),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               padding: const EdgeInsets.symmetric(
-                                horizontal: 20,
-                                vertical: 20,
+                                horizontal: 30,
+                                vertical: 10,
                               ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(20),
                               ),
-                            ),
-                          ),
-                        ),
-
-                        const SizedBox(width: 16), // Espacio entre los botones
-                        // Botón QUINLEI
-                        ElevatedButton.icon(
-                          onPressed: irAEvaluacionDano,
-                          icon: const Icon(
-                            Icons.analytics_outlined,
-                            size: 30,
-                            color: Colors.white,
-                          ),
-                          label: const Text(
-                            "QUINLEI",
-                            style: TextStyle(fontSize: 24, color: Colors.white),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueGrey,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 20,
-                              vertical: 20,
-                            ),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                         ),
@@ -537,43 +511,81 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 ),
               ),
 
-              const SizedBox(height: 30),
-              Align(
-                alignment: Alignment.bottomLeft,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      raicesAController.clear();
-                      raicesBController.clear();
-                      pesoAController.clear();
-                      pesoBController.clear();
-                      pesoHojasController.clear();
-                      ndviController.clear();
-                      observacionesController.clear();
-                      mensaje = "🧹 Formulario limpiado.";
-                      focusedController = null;
-                    });
-                  },
-                  icon: const Icon(
-                    Icons.delete_forever,
-                    color: Colors.white,
-                    size: 30,
-                  ),
-                  label: const Text(
-                    "LIMPIAR DATOS",
-                    style: TextStyle(fontSize: 30, color: Colors.white),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 30,
-                      vertical: 22,
+              const SizedBox(height: 15),
+              _buildInput(
+                "Observaciones",
+                observacionesController,
+                maxLines: 1,
+              ),
+
+              const SizedBox(height: 15),
+              Row(
+                children: [
+                  // Botón LIMPIAR DATOS
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        setState(() {
+                          raicesAController.clear();
+                          raicesBController.clear();
+                          pesoAController.clear();
+                          pesoBController.clear();
+                          pesoHojasController.clear();
+                          ndviController.clear();
+                          observacionesController.clear();
+                          mensaje = "🧹 Formulario limpiado.";
+                          focusedController = null;
+                        });
+                      },
+                      icon: const Icon(
+                        Icons.delete_forever,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                      label: const Text(
+                        "LIMPIAR DATOS",
+                        style: TextStyle(fontSize: 15, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 10,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
+                  ),
+
+                  const SizedBox(width: 16), // Espacio entre los botones
+                  // Botón QUINLEI
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: irAEvaluacionDano,
+                      icon: const Icon(
+                        Icons.analytics_outlined,
+                        size: 20,
+                        color: Colors.white,
+                      ),
+                      label: const Text(
+                        "QUINLEI",
+                        style: TextStyle(fontSize: 15, color: Colors.white),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueGrey,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 14,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ),
 
               if (mensaje.isNotEmpty)
@@ -845,7 +857,7 @@ class _CustomNDVIPadState extends State<CustomNDVIPad> {
               current,
               textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 46,
+                fontSize: 50,
                 color: error == null ? Colors.white : Colors.redAccent,
                 fontWeight: FontWeight.bold,
               ),
@@ -872,10 +884,13 @@ class _CustomNDVIPadState extends State<CustomNDVIPad> {
               return ElevatedButton(
                 onPressed: () => key == 'BORRAR' ? _backspace() : _input(key),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: key == 'BORRAR' ? Colors.red : Colors.black,
+                  backgroundColor: const Color.fromARGB(255, 0, 0, 0),
+                  foregroundColor:
+                      key == 'BORRAR'
+                          ? Colors.red
+                          : const Color.fromARGB(255, 255, 255, 255),
                   textStyle: const TextStyle(
-                    fontSize: 28,
+                    fontSize: 25,
                     fontWeight: FontWeight.bold,
                   ),
                 ),

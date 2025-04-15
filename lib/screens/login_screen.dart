@@ -178,7 +178,7 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(20.0),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
@@ -208,7 +208,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             );
                           }).toList(),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 40),
                   ],
                 ),
               _buildTextField(
@@ -244,9 +244,9 @@ class _LoginScreenState extends State<LoginScreen> {
               const SizedBox(height: 10),
               ElevatedButton.icon(
                 onPressed: loginUser,
-                icon: const Icon(Icons.login, size: 28),
+                icon: const Icon(Icons.login, size: 20),
                 label: const Text(
-                  "Iniciar sesión",
+                  "Inicio Admin",
                   style: TextStyle(fontSize: 22),
                 ),
                 style: ElevatedButton.styleFrom(
@@ -303,12 +303,12 @@ class _LoginScreenState extends State<LoginScreen> {
                 },
 
                 icon: const Icon(Icons.play_arrow),
-                label: const Text("Iniciar", style: TextStyle(fontSize: 22)),
+                label: const Text("Operador", style: TextStyle(fontSize: 40)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF005A56),
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
+                    horizontal: 80,
                     vertical: 16,
                   ),
                   shape: RoundedRectangleBorder(
@@ -345,11 +345,11 @@ class _LoginScreenState extends State<LoginScreen> {
     bool obscure = false,
   }) {
     return SizedBox(
-      width: 300,
+      width: 400,
       child: TextField(
         controller: controller,
         obscureText: obscure,
-        style: const TextStyle(fontSize: 20, color: Colors.black),
+        style: const TextStyle(fontSize: 18, color: Colors.black),
         decoration: InputDecoration(
           labelText: label,
           labelStyle: const TextStyle(color: Colors.black87, fontSize: 18),

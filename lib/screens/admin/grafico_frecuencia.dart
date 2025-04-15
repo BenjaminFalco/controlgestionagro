@@ -278,13 +278,8 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
           final ndvi = data['ndvi'] ?? '';
           final observaciones = data['observaciones'] ?? '';
 
-          final frecuenciaSnap =
-              await parcela.reference
-                  .collection('tratamientos')
-                  .doc('frecuencia')
-                  .get();
-
-          Map<String, dynamic> frecuencias = frecuenciaSnap.data() ?? {};
+          // 👇 Extraer directamente desde el campo "evaluacion" en la parcela
+          Map<String, dynamic> frecuencias = parcela['evaluacion'] ?? {};
           List<int> quinlei = List.generate(8, (i) => frecuencias['$i'] ?? 0);
           final totalEvaluadas = quinlei.fold(0, (sum, val) => sum + val);
 
@@ -304,7 +299,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             ndvi,
             observaciones,
             ...quinlei,
-            totalEvaluadas,
+            totalEvaluadas, // 👈 columna final Total
           ]);
         }
       }
@@ -312,19 +307,16 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
       final nombreArchivo =
           "${nombreCiudad}_${nombreSerie}_${DateFormat('yyyyMMdd').format(fechaCosecha ?? DateTime.now())}"
               .replaceAll(" ", "_")
-              .replaceAll("/", "-");
+              .replaceAll("/", "-") +
+          ".xlsx";
 
-      // ✅ Ruta multiplataforma
-      Directory outputDir;
-      if (Platform.isAndroid) {
-        outputDir = Directory('/storage/emulated/0/Download');
-      } else if (Platform.isWindows) {
-        outputDir = await getApplicationDocumentsDirectory();
-      } else {
-        outputDir = await getTemporaryDirectory();
+      // 📂 Guardar en carpeta de descargas pública (Android)
+      final directory = Directory('/storage/emulated/0/Download');
+      if (!await directory.exists()) {
+        await directory.create(recursive: true);
       }
 
-      final filePath = "${outputDir.path}/$nombreArchivo.xlsx";
+      final filePath = "${directory.path}/$nombreArchivo";
       final file = File(filePath);
       final bytes = excel.encode();
       await file.writeAsBytes(bytes!);
@@ -336,7 +328,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
               (_) => AlertDialog(
                 title: const Text("✅ Exportación exitosa"),
                 content: SelectableText(
-                  "El archivo fue guardado correctamente en:\n\n$filePath",
+                  "El archivo fue guardado en:\n$filePath",
                 ),
                 actions: [
                   TextButton(
@@ -363,7 +355,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
           builder:
               (_) => AlertDialog(
                 title: const Text("❌ Error en la exportación"),
-                content: Text("Error:\n\n$e"),
+                content: Text("Error:\n$e"),
                 actions: [
                   TextButton(
                     onPressed: () => Navigator.pop(context),
