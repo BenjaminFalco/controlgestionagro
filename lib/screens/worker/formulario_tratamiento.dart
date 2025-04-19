@@ -303,6 +303,16 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     final pesoB = double.tryParse(pesoBController.text.trim()) ?? 0.0;
     final pesoTotal = pesoA + pesoB;
 
+    final parcelaData =
+        parcelas.isNotEmpty
+            ? parcelas[currentIndex].data() as Map<String, dynamic>
+            : <String, dynamic>{};
+
+    final numeroFicha =
+        parcelaData.containsKey('numero_ficha')
+            ? parcelaData['numero_ficha']?.toString() ?? '-'
+            : '-';
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -344,7 +354,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    "N° Ficha: ${parcela['numero_ficha'] ?? '-'}",
+                    "N° Ficha: $numeroFicha",
                     style: const TextStyle(
                       fontSize: 20,
                       color: Colors.white,
@@ -362,6 +372,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                   ),
                 ],
               ),
+
               const SizedBox(height: 15),
 
               _buildInputPair(

@@ -583,9 +583,23 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                               serieId: serieSeleccionada!,
                                               bloqueId: bloqueSeleccionado!,
                                               parcelaDesde: doc['numero'],
-                                              numeroFicha: numeroFicha,
+                                              numeroFicha:
+                                                  (doc.data()
+                                                              as Map<
+                                                                String,
+                                                                dynamic
+                                                              >)
+                                                          .containsKey(
+                                                            'numero_ficha',
+                                                          )
+                                                      ? doc['numero_ficha']
+                                                              ?.toString() ??
+                                                          ''
+                                                      : '',
                                               numeroTratamiento:
-                                                  numeroTratamiento,
+                                                  doc['numero_tratamiento']
+                                                      ?.toString() ??
+                                                  '',
                                             ),
                                       ),
                                     );
