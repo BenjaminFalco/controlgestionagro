@@ -35,6 +35,7 @@ class FormularioTratamiento extends StatefulWidget {
 }
 
 class _FormularioTratamientoState extends State<FormularioTratamiento> {
+  bool guardado = false;
   late Box hiveBox;
   String? userId;
   List<dynamic> parcelas = [];
@@ -206,6 +207,100 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       ndviController.text = data['ndvi'] ?? '';
       observacionesController.text = data['observaciones'] ?? '';
     });
+  }
+
+  Future<void> anteriorParcela() async {
+    if (guardado) return; // 🚫 Evitar doble click mientras guarda
+
+    setState(() {
+      guardado = true;
+    });
+
+    try {
+      await guardarTratamientoActual(); // 🛡️ Guarda primero
+
+      if (currentIndex > 0) {
+        await Future.delayed(
+          const Duration(milliseconds: 200),
+        ); // ⏳ Pequeño delay visual
+        setState(() {
+          currentIndex--;
+        });
+        await cargarTratamientoActual(); // 🔄 Carga la parcela anterior
+      }
+    } catch (e) {
+      debugPrint('❌ Error en anteriorParcela: $e');
+    } finally {
+      setState(() {
+        guardado = false;
+      });
+    }
+  }
+
+  Future<void> siguienteParcela() async {
+    if (guardado) return; // 🚫 Previene doble click mientras guarda
+
+    setState(() {
+      guardado = true;
+    });
+
+    try {
+      await guardarTratamientoActual(); // 🛡️ Guarda la parcela actual
+
+      if (currentIndex < parcelas.length - 1) {
+        await Future.delayed(
+          const Duration(milliseconds: 200),
+        ); // ⏳ Pequeño delay visual
+        setState(() {
+          currentIndex++;
+        });
+        await cargarTratamientoActual(); // 🔄 Carga nueva parcela
+      } else {
+        // 🚀 Última parcela
+        await guardarTratamientoActual();
+
+        final serieRef = FirebaseFirestore.instance
+            .collection('ciudades')
+            .doc(widget.ciudadId)
+            .collection('series')
+            .doc(widget.serieId);
+
+        await serieRef.update({'fecha_cosecha': Timestamp.now()});
+
+        if (mounted) {
+          showDialog(
+            context: context,
+            barrierDismissible: false,
+            builder:
+                (_) => AlertDialog(
+                  title: const Text("¡Tratamiento Finalizado!"),
+                  content: const Text(
+                    "Has terminado todas las parcelas de todos los bloques.",
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pushAndRemoveUntil(
+                          MaterialPageRoute(
+                            builder: (_) => const InicioTratamientoScreen(),
+                          ),
+                          (route) => false,
+                        );
+                      },
+                      child: const Text("Volver al inicio"),
+                    ),
+                  ],
+                ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error en siguienteParcela: $e');
+    } finally {
+      setState(() {
+        guardado = false;
+      });
+    }
   }
 
   void monitorConexionParaSincronizar() {
@@ -699,12 +794,8 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed:
-                                currentIndex > 0
-                                    ? () async {
-                                      await guardarTratamientoActual();
-                                      setState(() => currentIndex--);
-                                      await cargarTratamientoActual();
-                                    }
+                                (currentIndex > 0 && !guardado)
+                                    ? () => anteriorParcela()
                                     : null,
                             icon: const Icon(
                               Icons.arrow_back,
@@ -735,59 +826,8 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                         // Botón SIGUIENTE
                         Expanded(
                           child: ElevatedButton.icon(
-                            onPressed: () async {
-                              await guardarTratamientoActual();
-
-                              if (currentIndex < parcelas.length - 1) {
-                                setState(() => currentIndex++);
-                                await cargarTratamientoActual();
-                              } else {
-                                await guardarTratamientoActual();
-
-                                final serieRef = FirebaseFirestore.instance
-                                    .collection('ciudades')
-                                    .doc(widget.ciudadId)
-                                    .collection('series')
-                                    .doc(widget.serieId);
-
-                                await serieRef.update({
-                                  'fecha_cosecha': Timestamp.now(),
-                                });
-
-                                showDialog(
-                                  context: context,
-                                  barrierDismissible: false,
-                                  builder:
-                                      (context) => AlertDialog(
-                                        title: const Text(
-                                          "¡Tratamiento Finalizado!",
-                                        ),
-                                        content: const Text(
-                                          "Has terminado todas las parcelas de todos los bloques.",
-                                        ),
-                                        actions: [
-                                          TextButton(
-                                            onPressed: () {
-                                              Navigator.of(
-                                                context,
-                                              ).pushAndRemoveUntil(
-                                                MaterialPageRoute(
-                                                  builder:
-                                                      (_) =>
-                                                          const InicioTratamientoScreen(),
-                                                ),
-                                                (route) => false,
-                                              );
-                                            },
-                                            child: const Text(
-                                              "Volver al inicio",
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                );
-                              }
-                            },
+                            onPressed:
+                                guardado ? null : () => siguienteParcela(),
                             icon: const Icon(
                               Icons.save_alt,
                               size: 34,

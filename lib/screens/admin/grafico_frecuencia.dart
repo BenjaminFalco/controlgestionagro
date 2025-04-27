@@ -132,6 +132,8 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 
       for (var parcelaDoc in parcelasSnap.docs) {
         final data = parcelaDoc.data();
+
+        // 🔵 Primero extraemos número de ficha y número de tratamiento
         final numeroFicha =
             data.containsKey('numero_ficha') ? data['numero_ficha'] : 0;
         final numeroTratamiento =
@@ -144,12 +146,11 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                 .collection('tratamientos')
                 .doc('actual')
                 .get();
-
-        // ✅ Validación clave agregada
         if (!tratamientoSnap.exists) continue;
-
         final tratamiento = tratamientoSnap.data() ?? {};
 
+        final raicesA = int.tryParse(tratamiento['raicesA'] ?? '0') ?? 0;
+        final raicesB = int.tryParse(tratamiento['raicesB'] ?? '0') ?? 0;
         final pesoA = double.tryParse(tratamiento['pesoA'] ?? '0') ?? 0;
         final pesoB = double.tryParse(tratamiento['pesoB'] ?? '0') ?? 0;
         final pesoRaices = pesoA + pesoB;
@@ -162,10 +163,6 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
           8,
           (i) => (evaluacionMap['$i'] ?? 0) as int,
         );
-
-        for (int i = 0; i <= 7; i++) {
-          frecuenciaNotas[i] = (frecuenciaNotas[i] ?? 0) + frecNotas[i];
-        }
 
         todasLasParcelas.add(
           _DatoParcela(
@@ -181,6 +178,8 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             ndvi: ndvi,
             observaciones: observaciones,
             frecuenciaNotas: frecNotas,
+            raicesA: raicesA,
+            raicesB: raicesB,
           ),
         );
       }
@@ -651,7 +650,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                                             ),
                                           ),
                                         DataCell(
-                                          Text(p.totalEvaluadas.toString()),
+                                          Text(p.totalRaices.toString()),
                                         ),
                                       ],
                                     );
@@ -734,7 +733,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 
 class _DatoParcela {
   final int numeroFicha;
-  final DateTime? fechaCosecha; // ✅ AÑADIDO
+  final DateTime? fechaCosecha;
   final String nombreSerie;
   final String nombreCiudad;
   final num superficie;
@@ -747,9 +746,12 @@ class _DatoParcela {
   final String observaciones;
   final List<int> frecuenciaNotas;
 
+  final int raicesA; // ⬅️ nuevo
+  final int raicesB; // ⬅️ nuevo
+
   _DatoParcela({
     required this.numeroFicha,
-    required this.fechaCosecha, // ✅ AÑADIDO
+    required this.fechaCosecha,
     required this.nombreSerie,
     required this.nombreCiudad,
     required this.superficie,
@@ -760,8 +762,9 @@ class _DatoParcela {
     required this.ndvi,
     required this.observaciones,
     required this.frecuenciaNotas,
+    required this.raicesA,
+    required this.raicesB,
   });
 
-  int get totalEvaluadas =>
-      frecuenciaNotas.fold(0, (a, b) => a + b); // 👈 NUEVO
+  int get totalRaices => raicesA + raicesB; // ⬅️ NUEVO getter
 }
