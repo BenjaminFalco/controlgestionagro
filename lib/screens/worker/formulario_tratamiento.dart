@@ -4,6 +4,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'evaluacion_dano.dart';
 import 'package:intl/intl.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 class AlwaysDisabledFocusNode extends FocusNode {
   @override
@@ -33,7 +35,9 @@ class FormularioTratamiento extends StatefulWidget {
 }
 
 class _FormularioTratamientoState extends State<FormularioTratamiento> {
-  List<DocumentSnapshot> parcelas = [];
+  late Box hiveBox;
+  String? userId;
+  List<dynamic> parcelas = [];
   int currentIndex = 0;
   TextEditingController? focusedController;
 
@@ -50,12 +54,15 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
   @override
   void initState() {
     super.initState();
+    hiveBox = Hive.box('offline_tratamientos');
+    userId = FirebaseAuth.instance.currentUser?.uid ?? 'anon';
     cargarCiudadYSerie();
     cargarTodasLasParcelas();
     raicesAController.addListener(() => setState(() {}));
     raicesBController.addListener(() => setState(() {}));
     pesoAController.addListener(() => setState(() {}));
     pesoBController.addListener(() => setState(() {}));
+    monitorConexionParaSincronizar();
   }
 
   Map<String, dynamic>? ciudad;
@@ -84,32 +91,144 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     });
   }
 
+  String obtenerCampoActual(String campo) {
+    final current = parcelas[currentIndex];
+    if (current is DocumentSnapshot) {
+      final data = current.data() as Map<String, dynamic>?;
+      return data?[campo]?.toString() ?? '-';
+    } else if (current is Map<String, dynamic>) {
+      return current[campo]?.toString() ?? '-';
+    }
+    return '-';
+  }
+
+  String obtenerNombreBloqueActual() {
+    final current = parcelas[currentIndex];
+    if (current is DocumentSnapshot) {
+      final bloqueId = current.reference.parent.parent?.id;
+      return nombresBloques[bloqueId] ?? '...';
+    } else if (current is Map<String, dynamic>) {
+      final bloqueId = current['bloqueId'];
+      return nombresBloques[bloqueId] ?? '...';
+    }
+    return '...';
+  }
+
   Future<void> guardarTratamientoActual() async {
     final parcela = parcelas[currentIndex];
-    final ref = parcela.reference.collection('tratamientos').doc('actual');
+    final id = (parcela is DocumentSnapshot) ? parcela.id : parcela['id'];
+    final key =
+        'tratamiento_${widget.ciudadId}_${widget.serieId}_${widget.bloqueId}_$id';
 
-    await ref.set({
-      'raicesA': raicesAController.text.trim(),
-      'raicesB': raicesBController.text.trim(),
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity != ConnectivityResult.none;
+
+    Map<String, dynamic> tratamientoPrevio = {};
+
+    if (online && parcela is DocumentSnapshot) {
+      final ref = parcela.reference.collection('tratamientos').doc('actual');
+      final doc = await ref.get();
+      if (doc.exists) {
+        tratamientoPrevio = doc.data()!;
+      }
+    } else {
+      final dataOffline = hiveBox.get(key);
+      if (dataOffline != null) {
+        tratamientoPrevio = Map<String, dynamic>.from(dataOffline);
+      }
+    }
+
+    // Aquí construimos el nuevo Data respetando raíces actuales si están en los controllers
+    final nuevoData = {
+      ...tratamientoPrevio, // Copiamos todo lo anterior
+      if (raicesAController.text.trim().isNotEmpty)
+        'raicesA':
+            raicesAController.text.trim(), // Solo si el usuario ingresó algo
+      if (raicesBController.text.trim().isNotEmpty)
+        'raicesB': raicesBController.text.trim(),
       'pesoA': pesoAController.text.trim(),
       'pesoB': pesoBController.text.trim(),
       'pesoHojas': pesoHojasController.text.trim(),
       'ndvi': ndviController.text.trim(),
       'observaciones': observacionesController.text.trim(),
-      'fecha': Timestamp.now(),
-      'trabajador': FirebaseAuth.instance.currentUser?.email ?? 'desconocido',
-    });
+      'fecha': DateTime.now().toIso8601String(),
+      'sincronizado': false,
+      'usuario': userId,
+    };
+
+    if (online && parcela is DocumentSnapshot) {
+      final ref = parcela.reference.collection('tratamientos').doc('actual');
+      await ref.set(nuevoData);
+    } else {
+      await hiveBox.put(key, nuevoData);
+    }
   }
 
   Future<void> cargarTratamientoActual() async {
     if (parcelas.isEmpty) return;
 
     final parcela = parcelas[currentIndex];
-    final doc =
-        await parcela.reference.collection('tratamientos').doc('actual').get();
+    final id = (parcela is DocumentSnapshot) ? parcela.id : parcela['id'];
+    final key =
+        'tratamiento_${widget.ciudadId}_${widget.serieId}_${widget.bloqueId}_$id';
 
-    if (doc.exists) {
-      final data = doc.data()!;
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity != ConnectivityResult.none;
+
+    if (online && parcela is DocumentSnapshot) {
+      final doc =
+          await parcela.reference
+              .collection('tratamientos')
+              .doc('actual')
+              .get();
+      if (doc.exists) {
+        final data = doc.data()!;
+        cargarEnControladores(data);
+        return;
+      }
+    }
+
+    final data = hiveBox.get(key);
+    if (data != null) {
+      cargarEnControladores(data);
+    } else {
+      limpiarFormulario();
+    }
+  }
+
+  void cargarEnControladores(Map<String, dynamic> data) {
+    setState(() {
+      raicesAController.text = data['raicesA'] ?? '';
+      raicesBController.text = data['raicesB'] ?? '';
+      pesoAController.text = data['pesoA'] ?? '';
+      pesoBController.text = data['pesoB'] ?? '';
+      pesoHojasController.text = data['pesoHojas'] ?? '';
+      ndviController.text = data['ndvi'] ?? '';
+      observacionesController.text = data['observaciones'] ?? '';
+    });
+  }
+
+  void monitorConexionParaSincronizar() {
+    Connectivity().onConnectivityChanged.listen((result) async {
+      if (result != ConnectivityResult.none) {
+        print("📶 Conexión detectada. Puedes sincronizar.");
+        // Aquí luego llamas a sincronización real si lo deseas
+      } else {
+        print("⚠️ Sin conexión. Usando datos locales de Hive.");
+      }
+    });
+  }
+
+  Future<void> cargarTratamientoActualOffline() async {
+    if (parcelas.isEmpty) return;
+
+    final parcela = parcelas[currentIndex];
+    final box = Hive.box('offline_tratamientos');
+    final id =
+        parcela['id']; // asegúrate de guardar esto al momento de persistir
+    final data = box.get(id);
+
+    if (data != null) {
       setState(() {
         raicesAController.text = data['raicesA'] ?? '';
         raicesBController.text = data['raicesB'] ?? '';
@@ -124,33 +243,116 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     }
   }
 
-  Future<void> cargarTodasLasParcelas() async {
-    final bloquesSnap =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(widget.ciudadId)
-            .collection('series')
-            .doc(widget.serieId)
-            .collection('bloques')
-            .orderBy('nombre') // Ordenar A-Z
-            .get();
+  Future<void> sincronizarTratamientosPendientes() async {
+    final keys = hiveBox.keys.where(
+      (k) => k.toString().startsWith('tratamiento_'),
+    );
 
-    List<DocumentSnapshot> todasParcelas = [];
+    for (final key in keys) {
+      final data = hiveBox.get(key);
+      if (data != null && data['sincronizado'] == false) {
+        try {
+          final ref = FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(data['ciudadId'])
+              .collection('series')
+              .doc(data['serieId'])
+              .collection('bloques')
+              .doc(data['bloqueId'])
+              .collection('parcelas')
+              .doc(data['parcelaId'])
+              .collection('tratamientos')
+              .doc('actual');
 
-    for (final bloque in bloquesSnap.docs) {
-      final bloqueId = bloque.id;
-      final nombreBloque = bloque['nombre'];
-      nombresBloques[bloqueId] = nombreBloque;
-
-      final parcelasSnap =
-          await bloque.reference.collection('parcelas').orderBy('numero').get();
-
-      todasParcelas.addAll(parcelasSnap.docs);
+          await ref.set(data);
+          data['sincronizado'] = true;
+          await hiveBox.put(key, data);
+          print("✅ Sincronizado: $key");
+        } catch (e) {
+          print("❌ Error al sincronizar $key: $e");
+        }
+      }
     }
+  }
+
+  Future<void> cargarTodasLasParcelas() async {
+    final box = Hive.box('offline_parcelas');
+    final claveBloques = 'bloques_${widget.ciudadId}_${widget.serieId}';
+    final claveParcelas = 'parcelas_${widget.ciudadId}_${widget.serieId}';
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final online = connectivity != ConnectivityResult.none;
+
+    List<dynamic> todasParcelas = [];
+
+    if (online) {
+      try {
+        final bloquesSnap =
+            await FirebaseFirestore.instance
+                .collection('ciudades')
+                .doc(widget.ciudadId)
+                .collection('series')
+                .doc(widget.serieId)
+                .collection('bloques')
+                .orderBy('nombre')
+                .get();
+
+        List<dynamic> bloquesParaHive = [];
+        List<dynamic> parcelasParaHive = [];
+
+        for (final bloque in bloquesSnap.docs) {
+          final bloqueId = bloque.id;
+          final nombreBloque =
+              (bloque.data() as Map<String, dynamic>)['nombre'] ?? '...';
+
+          nombresBloques[bloqueId] = nombreBloque;
+
+          bloquesParaHive.add({'id': bloqueId, 'nombre': nombreBloque});
+
+          final parcelasSnap =
+              await bloque.reference
+                  .collection('parcelas')
+                  .orderBy('numero')
+                  .get();
+
+          for (final p in parcelasSnap.docs) {
+            final data = p.data();
+            data['id'] = p.id;
+            data['bloque'] = bloqueId;
+            parcelasParaHive.add(data);
+            todasParcelas.add(p);
+          }
+        }
+
+        // Guardar respaldo en Hive
+        await box.put(claveBloques, bloquesParaHive);
+        await box.put(claveParcelas, parcelasParaHive);
+      } catch (e) {
+        print("❌ Error online al cargar parcelas: $e");
+      }
+    } else {
+      // Cargar desde Hive
+      final bloquesOffline = box.get(claveBloques) ?? [];
+      final parcelasOffline = box.get(claveParcelas) ?? [];
+
+      for (final bloque in bloquesOffline) {
+        nombresBloques[bloque['id']] = bloque['nombre'];
+      }
+
+      todasParcelas = parcelasOffline;
+    }
+
+    final index = todasParcelas.indexWhere((p) {
+      final data =
+          (p is DocumentSnapshot)
+              ? p.data() as Map<String, dynamic>?
+              : p as Map<String, dynamic>;
+      return data?['numero'] == widget.parcelaDesde;
+    });
 
     setState(() {
       parcelas = todasParcelas;
-      currentIndex = 0;
+      currentIndex = (index != -1) ? index : 0;
     });
 
     await cargarTratamientoActual();
@@ -262,30 +464,43 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
     observacionesController.clear();
   }
 
-  void irAEvaluacionDano() {
+  void irAEvaluacionDano() async {
     final cantidadA = int.tryParse(raicesAController.text.trim()) ?? 0;
     final cantidadB = int.tryParse(raicesBController.text.trim()) ?? 0;
     final totalRaices = cantidadA + cantidadB;
 
     final parcela = parcelas[currentIndex];
 
-    Navigator.push(
+    final resultado = await Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (_) => EvaluacionDanoScreen(
               parcelaRef: parcela.reference,
               totalRaices: totalRaices,
-              ciudadId: widget.ciudadId, // 👈 agregado
+              ciudadId: widget.ciudadId,
               serieId: widget.serieId,
             ),
       ),
     );
+
+    // Puedes hacer algo al volver, como refrescar la UI
+    if (resultado == 'guardado' || resultado == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Evaluación guardada correctamente'),
+          duration: Duration(seconds: 2),
+        ),
+      );
+      setState(() {
+        // Opcional: refrescar algo visual o recargar datos si quieres
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (parcelas.isEmpty) {
+    if (parcelas.isEmpty || currentIndex >= parcelas.length) {
       return const Scaffold(
         backgroundColor: Colors.black,
         body: Center(child: CircularProgressIndicator(color: Colors.white)),
@@ -318,29 +533,73 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       appBar: AppBar(
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              "T ${parcelas[currentIndex]['numero_tratamiento']} - BLOQUE ${nombresBloques[parcelas[currentIndex].reference.parent.parent!.id] ?? '...'}",
-              style: const TextStyle(fontSize: 20, color: Colors.white),
-            ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          tooltip: "Volver atrás",
+          onPressed: () {
+            Navigator.pop(context);
+          },
+        ),
+        title: LayoutBuilder(
+          builder: (context, constraints) {
+            return Row(
+              children: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  tooltip: "Refrescar datos",
+                  onPressed: () async {
+                    await cargarCiudadYSerie();
+                    await cargarTodasLasParcelas();
+                    await cargarTratamientoActual();
 
-            if (ciudad != null && serie != null)
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    ciudad!['nombre'],
-                    style: const TextStyle(fontSize: 16, color: Colors.white),
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("✅ Datos actualizados"),
+                          duration: Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    }
+                  },
+                ),
+                const SizedBox(width: 8),
+                // Título dinámico (tratamiento y bloque)
+                Expanded(
+                  child: Text(
+                    "T ${obtenerCampoActual('numero_tratamiento')} - BLOQUE ${obtenerNombreBloqueActual()}",
+
+                    style: const TextStyle(fontSize: 18, color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  Text(
-                    serie!['nombre'],
-                    style: const TextStyle(fontSize: 16, color: Colors.white),
+                ),
+                const SizedBox(width: 8),
+                // Ciudad y Serie alineadas a la derecha
+                if (ciudad != null && serie != null)
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text(
+                        ciudad!['nombre'],
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        serie!['nombre'],
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.white,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-          ],
+              ],
+            );
+          },
         ),
       ),
 
@@ -436,6 +695,43 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
+                        // Botón RETROCEDER
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed:
+                                currentIndex > 0
+                                    ? () async {
+                                      await guardarTratamientoActual();
+                                      setState(() => currentIndex--);
+                                      await cargarTratamientoActual();
+                                    }
+                                    : null,
+                            icon: const Icon(
+                              Icons.arrow_back,
+                              size: 34,
+                              color: Colors.white,
+                            ),
+                            label: const Text(
+                              "ANTERIOR",
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.white,
+                              ),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.blueGrey,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 30,
+                                vertical: 10,
+                              ),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(width: 12), // Espacio entre botones
                         // Botón SIGUIENTE
                         Expanded(
                           child: ElevatedButton.icon(
@@ -790,11 +1086,37 @@ class _CustomNDVIPadState extends State<CustomNDVIPad> {
     _validate();
   }
 
+  bool _isKeyDisabled(String key) {
+    if (key == 'BORRAR') return false;
+    if (current.length >= 4) return true;
+    if (key == '.' && current.contains('.')) return true;
+    return false;
+  }
+
   void _input(String val) {
+    // Si se escribe '1' como primer dígito, completar a '1.00'
+    if (val == '1' && current.isEmpty) {
+      setState(() {
+        current = '1.00';
+        _validate();
+        widget.onChanged(current);
+      });
+      return;
+    }
+
+    // No permitir más de 4 caracteres (excepto si es autocompletado como 1.00)
+    if (current.length >= 4) return;
+    if (val == '.' && current.contains('.')) return;
+
+    String next = current + val;
+
+    // Asegura que el primer carácter sea 0 si no fue 1
+    if (next.length == 1 && !(next == '0' || next == '1')) return;
+
     setState(() {
-      if (val == '.' && current.contains('.')) return;
-      current += val;
+      current = next;
       _validate();
+      widget.onChanged(current);
     });
   }
 
@@ -803,18 +1125,20 @@ class _CustomNDVIPadState extends State<CustomNDVIPad> {
       if (current.isNotEmpty) {
         current = current.substring(0, current.length - 1);
         _validate();
+        widget.onChanged(current);
       }
     });
   }
 
   void _validate() {
-    final value = double.tryParse(current);
-    if (value == null || value < 0 || value > 1) {
-      error = "Debe estar entre 0.00 y 1.00";
-    } else {
-      error = null;
-    }
-    widget.onChanged(current);
+    final regex = RegExp(r'^(0(\.\d{1,2})?|1\.00)$');
+    setState(() {
+      if (regex.hasMatch(current)) {
+        error = null;
+      } else {
+        error = "Formato inválido (ej: 0.75 o 1.00)";
+      }
+    });
   }
 
   void _submit() {
@@ -891,9 +1215,20 @@ class _CustomNDVIPadState extends State<CustomNDVIPad> {
               childAspectRatio: 1.6,
             ),
             itemBuilder: (context, index) {
+              bool _isKeyDisabled(String key) {
+                if (key == 'BORRAR') return false;
+                if (current.length >= 4) return true;
+                if (key == '.' && current.contains('.')) return true;
+                return false;
+              }
+
               final key = keys[index];
               return ElevatedButton(
-                onPressed: () => key == 'BORRAR' ? _backspace() : _input(key),
+                onPressed:
+                    _isKeyDisabled(key)
+                        ? null
+                        : () => key == 'BORRAR' ? _backspace() : _input(key),
+
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color.fromARGB(255, 0, 0, 0),
                   foregroundColor:

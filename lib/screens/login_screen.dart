@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:controlgestionagro/screens/worker/inicio_tratamiento.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
@@ -8,6 +9,13 @@ import 'register_screen.dart';
 import 'setup_screen.dart';
 import 'admin/admin_dashboard.dart';
 import 'worker/worker_dashboard.dart';
+
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:hive/hive.dart';
+import 'package:controlgestionagro/models/users_local.dart';
+
+import 'package:hive/hive.dart';
+import '../models/users_local.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -70,6 +78,17 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const SetupScreen()),
         );
       } else {
+        // 🟡 GUARDAR EN HIVE
+        final usuarioBox = Hive.box('offline_user');
+        final usuarioLocal = UsuarioLocal(
+          uid: uid,
+          email: emailController.text.trim(),
+          rol: userData['rol'] ?? '',
+          nombre: userData['nombre'] ?? '',
+          ciudad: userData['ciudad'] ?? '',
+        );
+        await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
+
         final rol = userData['rol'];
         if (rol == "admin") {
           Navigator.pushReplacement(
@@ -127,6 +146,18 @@ class _LoginScreenState extends State<LoginScreen> {
         );
       } else {
         final data = userDoc.data() as Map<String, dynamic>;
+
+        // 🟡 GUARDAR EN HIVE
+        final usuarioBox = Hive.box('offline_user');
+        final usuarioLocal = UsuarioLocal(
+          uid: uid,
+          email: email,
+          rol: data['rol'] ?? '',
+          nombre: data['nombre'] ?? '',
+          ciudad: data['ciudad'] ?? '',
+        );
+        await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
+
         if (data['rol'] == null || data['nombre'] == null) {
           Navigator.pushReplacement(
             context,
@@ -265,43 +296,35 @@ class _LoginScreenState extends State<LoginScreen> {
 
               ElevatedButton.icon(
                 onPressed: () async {
-                  try {
-                    UserCredential anonUser =
-                        await FirebaseAuth.instance.signInAnonymously();
+                  final currentUser = FirebaseAuth.instance.currentUser;
 
-                    // Crea el documento del trabajador anónimo si no existe
-                    final uid = anonUser.user!.uid;
-                    final userDoc =
-                        await FirebaseFirestore.instance
-                            .collection('usuarios')
-                            .doc(uid)
-                            .get();
-
-                    if (!userDoc.exists) {
-                      await FirebaseFirestore.instance
-                          .collection('usuarios')
-                          .doc(uid)
-                          .set({
-                            'nombre': 'Trabajador Invitado',
-                            'rol': 'trabajador',
-                            'ciudad':
-                                'CiudadDemo', // ← reemplaza por ciudad real o pide selección
-                            'ensayos_asignados':
-                                [], // ← podrías llenar ensayos demo o reales aquí
-                          });
+                  if (currentUser == null) {
+                    try {
+                      // 🔵 Solo crea un usuario anónimo si NO hay uno ya.
+                      await FirebaseAuth.instance.signInAnonymously();
+                    } catch (e) {
+                      print('❌ Error al iniciar sesión anónima: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Error al iniciar sesión anónima'),
+                        ),
+                      );
+                      return;
                     }
-
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const WorkerDashboard(),
-                      ),
-                    );
-                  } catch (e) {
-                    print("❌ Error al iniciar sesión anónima: $e");
+                  } else if (!currentUser.isAnonymous) {
+                    // 🔴 Si existe un usuario pero no es anónimo, podrías cerrar sesión si quieres forzar modo operador
+                    await FirebaseAuth.instance.signOut();
+                    await FirebaseAuth.instance.signInAnonymously();
                   }
-                },
 
+                  // 🔵 Ahora, sí o sí hay un usuario anónimo activo. Vamos a InicioTratamientoScreen.
+                  Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const InicioTratamientoScreen(),
+                    ),
+                  );
+                },
                 icon: const Icon(Icons.play_arrow),
                 label: const Text("Operador", style: TextStyle(fontSize: 40)),
                 style: ElevatedButton.styleFrom(

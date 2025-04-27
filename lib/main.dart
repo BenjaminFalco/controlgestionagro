@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-
+import 'package:controlgestionagro/services/offline_sync_service.dart';
 import 'firebase_options.dart';
 import 'screens/loading_screen.dart';
 import 'screens/login_screen.dart';
@@ -13,12 +13,9 @@ import 'package:controlgestionagro/screens/worker/inicio_tratamiento.dart';
 
 /// 🔄 Escucha el estado de conexión para fines de depuración o sincronización
 void monitorConexion() {
-  Connectivity().onConnectivityChanged.listen((ConnectivityResult result) {
-    if (result == ConnectivityResult.none) {
-      debugPrint("🚫 Sin conexión, usando caché local");
-    } else {
-      debugPrint("✅ Conexión detectada, se sincronizarán los datos pendientes");
-      // TODO: aquí puedes llamar tu función para sincronizar datos Hive -> Firestore
+  Connectivity().onConnectivityChanged.listen((result) {
+    if (result != ConnectivityResult.none) {
+      OfflineSyncService().sincronizar();
     }
   });
 }
@@ -36,6 +33,18 @@ void main() async {
   // 🔹 Inicializa Hive para almacenamiento offline
   await Hive.initFlutter();
   await Hive.openBox('offline_data');
+  await Hive.openBox('user_data');
+  await Hive.openBox('offline_user'); // <- agrega esta
+
+  //data inicio_tratamiento
+  await Hive.openBox('offline_ciudades');
+  await Hive.openBox('offline_series');
+  await Hive.openBox('offline_bloques');
+  await Hive.openBox('offline_parcelas');
+
+  await Hive.openBox(
+    'offline_tratamientos',
+  ); // ✅ NECESARIO para FormularioTratamiento
 
   // 🔹 Monitorea la conexión
   monitorConexion();

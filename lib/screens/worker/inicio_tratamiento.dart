@@ -3,6 +3,11 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'formulario_tratamiento.dart';
 import '../login_screen.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:uuid/uuid.dart';
+import 'package:controlgestionagro/models/tratamiento_local.dart';
+import 'package:controlgestionagro/services/offline_sync_service.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
 class InicioTratamientoScreen extends StatefulWidget {
   const InicioTratamientoScreen({super.key});
@@ -18,15 +23,15 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   String? bloqueSeleccionado;
   String? parcelaSeleccionada;
 
-  List<QueryDocumentSnapshot> ciudades = [];
-  List<QueryDocumentSnapshot> series = [];
+  List<dynamic> ciudades = [];
+  List<dynamic> series = [];
   List<String> bloques = [];
-  List<DocumentSnapshot> parcelas = [];
+  List<dynamic> parcelas = [];
 
   String numeroFicha = '';
   String numeroTratamiento = '';
   final TextEditingController superficieController = TextEditingController(
-    text: "10 m²",
+    text: "10",
   );
 
   @override
@@ -39,97 +44,264 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
     if (ciudadSeleccionada == null || serieSeleccionada == null) return;
 
     final superficie = superficieController.text.trim();
+    final box = Hive.box('offline_series');
+    final key = 'series_$ciudadSeleccionada';
 
-    await FirebaseFirestore.instance
-        .collection('ciudades')
-        .doc(ciudadSeleccionada!)
-        .collection('series')
-        .doc(serieSeleccionada!)
-        .update({'superficie': superficie});
-  }
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
 
-  Future<void> cargarCiudades() async {
-    final snapshot =
-        await FirebaseFirestore.instance.collection('ciudades').get();
-    setState(() {
-      ciudades = snapshot.docs;
-    });
-  }
-
-  Future<void> cargarSeries() async {
-    if (ciudadSeleccionada == null) return;
-    final snapshot =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(ciudadSeleccionada)
-            .collection('series')
-            .get();
-    setState(() {
-      series = snapshot.docs;
-    });
-  }
-
-  Future<void> cargarBloques() async {
-    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
-    final snapshot =
-        await FirebaseFirestore.instance
-            .collection('ciudades')
-            .doc(ciudadSeleccionada)
-            .collection('series')
-            .doc(serieSeleccionada)
-            .collection('bloques')
-            .get();
-    setState(() {
-      bloques = snapshot.docs.map((doc) => doc.id).toList();
-    });
-  }
-
-  Future<void> cargarParcelas() async {
-    if (bloqueSeleccionado == null) return;
-
-    final snapshot =
+    if (hayConexion) {
+      try {
+        // 🔄 Actualiza en Firestore
         await FirebaseFirestore.instance
             .collection('ciudades')
             .doc(ciudadSeleccionada!)
             .collection('series')
             .doc(serieSeleccionada!)
-            .collection('bloques')
-            .doc(bloqueSeleccionado!)
-            .collection('parcelas')
-            .orderBy('numero')
-            .get();
+            .update({'superficie': superficie});
 
-    final docs = snapshot.docs;
-
-    // Verificación de campo
-    bool faltanCampos = docs.any((doc) {
-      final data = doc.data() as Map<String, dynamic>?;
-      return data == null || !data.containsKey('numero_tratamiento');
-    });
-
-    if (faltanCampos) {
-      showDialog(
-        context: context,
-        builder:
-            (context) => AlertDialog(
-              title: const Text("⚠️ Campo faltante"),
-              content: const Text(
-                "Este bloque contiene parcelas sin 'número de tratamiento'.\n\nPor favor, pide al administrador que lo genere antes de continuar.",
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text("Aceptar"),
-                ),
-              ],
-            ),
-      );
-      return;
+        // 🔄 También actualiza en Hive
+        final lista = box.get(key) ?? [];
+        final actualizada =
+            (lista as List).map((e) {
+              if (e['id'] == serieSeleccionada) {
+                return {...e, 'superficie': superficie};
+              }
+              return e;
+            }).toList();
+        await box.put(key, actualizada);
+      } catch (e) {
+        print("❌ Error al guardar superficie online: $e");
+      }
+    } else {
+      // 📴 Modo offline: guarda solo en Hive
+      final lista = box.get(key) ?? [];
+      final actualizada =
+          (lista as List).map((e) {
+            if (e['id'] == serieSeleccionada) {
+              return {...e, 'superficie': superficie};
+            }
+            return e;
+          }).toList();
+      await box.put(key, actualizada);
+      print("📦 Superficie guardada en Hive offline.");
     }
+  }
 
-    setState(() {
-      parcelas = docs;
-    });
+  Future<void> cargarCiudades() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
+    final box = Hive.box('offline_ciudades');
+    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'default';
+
+    if (hayConexion) {
+      final snapshot =
+          await FirebaseFirestore.instance.collection('ciudades').get();
+      setState(() => ciudades = snapshot.docs);
+
+      final ciudadMapList =
+          snapshot.docs
+              .map((doc) => {'id': doc.id, 'nombre': doc['nombre']})
+              .toList();
+
+      await box.put('ciudades_$uid', ciudadMapList);
+    } else {
+      final local = box.get('ciudades_$uid') ?? [];
+      setState(() => ciudades = List<Map<String, dynamic>>.from(local));
+    }
+  }
+
+  Future<void> cargarSuperficieDesdeSerie() async {
+    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
+    final box = Hive.box('offline_series');
+
+    if (hayConexion) {
+      final doc =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadSeleccionada!)
+              .collection('series')
+              .doc(serieSeleccionada!)
+              .get();
+
+      final data = doc.data();
+      if (data != null && data.containsKey('superficie')) {
+        final superficie = data['superficie'].toString();
+        superficieController.text = superficie;
+
+        // 🔄 Guarda en Hive
+        final lista = box.get('series_$ciudadSeleccionada') ?? [];
+        final actualizada =
+            (lista as List).map((e) {
+              if (e['id'] == serieSeleccionada) {
+                return {...e, 'superficie': superficie};
+              }
+              return e;
+            }).toList();
+        await box.put('series_$ciudadSeleccionada', actualizada);
+      } else {
+        superficieController.text = '10';
+      }
+    } else {
+      // 🔄 Lee desde Hive
+      final lista = box.get('series_$ciudadSeleccionada') ?? [];
+      final serie = (lista as List).firstWhere(
+        (e) => e['id'] == serieSeleccionada,
+        orElse: () => {},
+      );
+      superficieController.text = serie['superficie']?.toString() ?? '10';
+    }
+  }
+
+  Future<void> cargarSeries() async {
+    if (ciudadSeleccionada == null) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
+    final box = Hive.box('offline_series');
+
+    if (hayConexion) {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadSeleccionada)
+              .collection('series')
+              .get();
+
+      setState(() => series = snapshot.docs);
+
+      final list =
+          snapshot.docs
+              .map((doc) => {'id': doc.id, 'nombre': doc['nombre']})
+              .toList();
+
+      await box.put('series_$ciudadSeleccionada', list);
+    } else {
+      final local = box.get('series_$ciudadSeleccionada') ?? [];
+      setState(() => series = List<Map<String, dynamic>>.from(local));
+    }
+  }
+
+  Future<void> cargarBloques() async {
+    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
+    final box = Hive.box('offline_bloques');
+
+    if (hayConexion) {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadSeleccionada)
+              .collection('series')
+              .doc(serieSeleccionada)
+              .collection('bloques')
+              .get();
+
+      final bloquesList = snapshot.docs.map((doc) => doc.id).toList();
+      setState(() => bloques = bloquesList);
+
+      await box.put('bloques_$serieSeleccionada', bloquesList);
+    } else {
+      final local = box.get('bloques_$serieSeleccionada') ?? [];
+      setState(() => bloques = List<String>.from(local));
+    }
+  }
+
+  Future<void> cargarParcelas() async {
+    if (bloqueSeleccionado == null) return;
+
+    final connectivity = await Connectivity().checkConnectivity();
+    final hayConexion = connectivity != ConnectivityResult.none;
+    final box = Hive.box('offline_parcelas');
+    final key =
+        'parcelas_${ciudadSeleccionada}_${serieSeleccionada}_$bloqueSeleccionado';
+
+    if (hayConexion) {
+      final snapshot =
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadSeleccionada!)
+              .collection('series')
+              .doc(serieSeleccionada!)
+              .collection('bloques')
+              .doc(bloqueSeleccionado!)
+              .collection('parcelas')
+              .orderBy('numero')
+              .get();
+
+      final docs = snapshot.docs;
+
+      bool faltanCampos = docs.any((doc) {
+        final data = doc.data();
+        return data == null || !data.containsKey('numero_tratamiento');
+      });
+
+      if (faltanCampos) {
+        showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text("⚠️ Campo faltante"),
+                content: const Text(
+                  "Este bloque contiene parcelas sin 'número de tratamiento'.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Aceptar"),
+                  ),
+                ],
+              ),
+        );
+        return;
+      }
+
+      setState(() => parcelas = docs);
+
+      final list =
+          docs
+              .map(
+                (doc) => {
+                  'id': doc.id,
+                  'numero': doc['numero'],
+                  'numero_tratamiento': doc['numero_tratamiento'],
+                  'numero_ficha': doc['numero_ficha'],
+                },
+              )
+              .toList();
+
+      await box.put(key, list);
+    } else {
+      final local = box.get(key) ?? [];
+
+      if (local.isEmpty) {
+        showDialog(
+          context: context,
+          builder:
+              (context) => AlertDialog(
+                title: const Text("Sin datos offline"),
+                content: const Text(
+                  "No hay datos guardados para este bloque en modo offline. Por favor, conéctate al menos una vez.",
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text("Aceptar"),
+                  ),
+                ],
+              ),
+        );
+        return;
+      }
+
+      // ✅ Este paso hace que el dropdown funcione en modo offline
+      setState(() => parcelas = List<Map<String, dynamic>>.from(local));
+    }
   }
 
   Future<void> actualizarInfoParcela(String id) async {
@@ -266,16 +438,17 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   Future<void> iniciarTratamiento() async {
     if (ciudadSeleccionada == null ||
         serieSeleccionada == null ||
-        bloqueSeleccionado == null ||
         parcelaSeleccionada == null)
       return;
 
-    await guardarSuperficieEnSerie(); // 🟢 Guardamos la superficie antes de avanzar
+    await guardarSuperficieEnSerie();
 
-    final doc = parcelas.firstWhere((p) => p.id == parcelaSeleccionada);
-    final data = doc.data() as Map<String, dynamic>?;
+    final doc = parcelas.firstWhere((p) => obtenerId(p) == parcelaSeleccionada);
+    final numeroTratamiento = obtenerCampo(doc, 'numero_tratamiento');
+    final numeroFicha = obtenerCampo(doc, 'numero_ficha');
+    final numeroParcela = int.tryParse(obtenerCampo(doc, 'numero')) ?? 0;
 
-    if (data == null || !data.containsKey('numero_tratamiento')) {
+    if (numeroTratamiento.isEmpty) {
       showDialog(
         context: context,
         builder:
@@ -302,10 +475,10 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             (_) => FormularioTratamiento(
               ciudadId: ciudadSeleccionada!,
               serieId: serieSeleccionada!,
-              bloqueId: bloqueSeleccionado!,
-              parcelaDesde: int.parse(data['numero'].toString()),
-              numeroFicha: data['numero_ficha']?.toString() ?? '',
-              numeroTratamiento: data['numero_tratamiento']?.toString() ?? '',
+              bloqueId: bloqueSeleccionado ?? '1',
+              parcelaDesde: numeroParcela,
+              numeroFicha: numeroFicha,
+              numeroTratamiento: numeroTratamiento,
             ),
       ),
     );
@@ -317,8 +490,28 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
       backgroundColor: Colors.black,
       appBar: AppBar(
         backgroundColor: Colors.white,
-        centerTitle: true,
         toolbarHeight: 70,
+        leading: IconButton(
+          icon: const Icon(Icons.refresh, color: Colors.black),
+          tooltip: "Refrescar datos",
+          onPressed: () async {
+            await cargarCiudades();
+            await cargarSeries();
+            await cargarBloques();
+            await cargarParcelas();
+
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("✅ Datos actualizados"),
+                  duration: Duration(seconds: 2),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+          },
+        ),
+        centerTitle: true,
         title: const Text(
           "POSICIONAR TERRENO",
           style: TextStyle(
@@ -344,6 +537,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
           ),
         ],
       ),
+
       body: GestureDetector(
         onTap: () => FocusScope.of(context).unfocus(),
         child: SafeArea(
@@ -365,9 +559,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                 ciudadSeleccionada,
                                 ciudades.map((doc) {
                                   return DropdownMenuItem(
-                                    value: doc.id,
+                                    value: obtenerId(doc),
                                     child: Text(
-                                      doc['nombre'],
+                                      obtenerCampo(doc, 'nombre'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
@@ -399,9 +593,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                 serieSeleccionada,
                                 series.map((doc) {
                                   return DropdownMenuItem(
-                                    value: doc.id,
+                                    value: obtenerId(doc),
                                     child: Text(
-                                      doc['nombre'],
+                                      obtenerCampo(doc, 'nombre'),
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
@@ -419,13 +613,17 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     parcelas.clear();
                                   });
                                   cargarBloques();
+                                  cargarSuperficieDesdeSerie();
                                 },
                               ),
                             ),
                           ),
                         ],
                       ),
+
                       const SizedBox(height: 16),
+
+                      // 🔹 Bloque y Tratamiento de inicio
                       Row(
                         children: [
                           Expanded(
@@ -465,9 +663,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                 parcelaSeleccionada,
                                 parcelas.map((doc) {
                                   return DropdownMenuItem(
-                                    value: doc.id,
+                                    value: obtenerId(doc),
                                     child: Text(
-                                      "T ${doc['numero_tratamiento']}",
+                                      "T ${obtenerCampo(doc, 'numero_tratamiento')}",
                                       style: const TextStyle(
                                         color: Colors.white,
                                         fontSize: 15,
@@ -477,9 +675,12 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   );
                                 }).toList(),
                                 (value) {
-                                  setState(() => parcelaSeleccionada = value);
-                                  if (value != null)
+                                  setState(() {
+                                    parcelaSeleccionada = value;
+                                  });
+                                  if (value != null) {
                                     actualizarInfoParcela(value);
+                                  }
                                 },
                               ),
                             ),
@@ -488,21 +689,37 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                       ),
                       const SizedBox(height: 16),
                       _buildFieldBox(
-                        TextField(
-                          controller: superficieController,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                          ),
-                          decoration: const InputDecoration(
-                            hintText: "Superficie cosechable (m²)",
-                            hintStyle: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 15,
+                        Row(
+                          children: [
+                            // Campo de número editable
+                            Expanded(
+                              child: TextField(
+                                controller: superficieController,
+                                keyboardType: TextInputType.number,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: "Superficie cosechable",
+                                  hintStyle: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 15,
+                                  ),
+                                  border: InputBorder.none,
+                                ),
+                              ),
                             ),
-                            border: InputBorder.none,
-                          ),
+                            const Text(
+                              "m²",
+                              style: TextStyle(
+                                fontSize: 15,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
 
@@ -559,52 +776,8 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                         child: ElevatedButton.icon(
                           onPressed:
                               parcelaSeleccionada != null
-                                  ? () async {
-                                    // Guardar superficie en la serie
-                                    final superficie =
-                                        superficieController.text.trim();
-                                    await FirebaseFirestore.instance
-                                        .collection('ciudades')
-                                        .doc(ciudadSeleccionada!)
-                                        .collection('series')
-                                        .doc(serieSeleccionada!)
-                                        .update({'superficie': superficie});
-
-                                    // Ir al formulario de tratamiento
-                                    final doc = parcelas.firstWhere(
-                                      (p) => p.id == parcelaSeleccionada,
-                                    );
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder:
-                                            (_) => FormularioTratamiento(
-                                              ciudadId: ciudadSeleccionada!,
-                                              serieId: serieSeleccionada!,
-                                              bloqueId: bloqueSeleccionado!,
-                                              parcelaDesde: doc['numero'],
-                                              numeroFicha:
-                                                  (doc.data()
-                                                              as Map<
-                                                                String,
-                                                                dynamic
-                                                              >)
-                                                          .containsKey(
-                                                            'numero_ficha',
-                                                          )
-                                                      ? doc['numero_ficha']
-                                                              ?.toString() ??
-                                                          ''
-                                                      : '',
-                                              numeroTratamiento:
-                                                  doc['numero_tratamiento']
-                                                      ?.toString() ??
-                                                  '',
-                                            ),
-                                      ),
-                                    );
-                                  }
-                                  : null, // Desactiva si no hay parcela seleccionada
+                                  ? iniciarTratamiento
+                                  : null,
                           icon: const Icon(Icons.play_arrow, size: 34),
                           label: const Text(
                             "INICIAR TOMA DE DATOS",
@@ -622,6 +795,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                           ),
                         ),
                       ),
+
                       const SizedBox(height: 40),
                     ],
                   ),
@@ -677,4 +851,40 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
       child: child,
     );
   }
+}
+
+QueryDocumentSnapshotFake _mapToQuerySnapshot(Map<String, dynamic> map) {
+  return QueryDocumentSnapshotFake(map['id'], {'nombre': map['nombre']});
+}
+
+class QueryDocumentSnapshotFake {
+  final String id;
+  final Map<String, dynamic> _data;
+
+  QueryDocumentSnapshotFake(this.id, this._data);
+
+  Map<String, dynamic> data() => _data;
+  dynamic operator [](String key) => _data[key];
+}
+
+String obtenerCampo(dynamic doc, String campo) {
+  try {
+    if (doc is QueryDocumentSnapshot || doc is DocumentSnapshot) {
+      return doc[campo]?.toString() ?? '';
+    } else if (doc is Map<String, dynamic>) {
+      return doc[campo]?.toString() ?? '';
+    }
+  } catch (_) {}
+  return '';
+}
+
+String obtenerId(dynamic doc) {
+  try {
+    if (doc is QueryDocumentSnapshot || doc is DocumentSnapshot) {
+      return doc.id;
+    } else if (doc is Map<String, dynamic>) {
+      return doc['id'] ?? '';
+    }
+  } catch (_) {}
+  return '';
 }

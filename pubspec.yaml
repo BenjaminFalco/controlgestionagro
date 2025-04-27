@@ -50,6 +50,8 @@ dependencies:
   share_plus: ^7.2.1
   pdf: ^3.10.4
   excel: ^2.1.0
+ 
+
 
 
 dev_dependencies:

@@ -104,9 +104,26 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
   Future<void> cargarParcela() async {
     final snap = await widget.parcelaRef.get();
-    setState(() {
-      parcelaData = snap.data() as Map<String, dynamic>?;
-    });
+    final data = snap.data() as Map<String, dynamic>?;
+
+    if (data != null) {
+      setState(() {
+        parcelaData = data;
+
+        // Aseguramos que totalRaices refleje el valor real de Firestore
+        if (parcelaData!['raicesA'] != null) {
+          final raicesGuardadas =
+              int.tryParse(parcelaData!['raicesA'].toString()) ?? 0;
+          if (raicesGuardadas > 0 && raicesGuardadas != widget.totalRaices) {
+            // Aquí podrías lanzar un error o corregir
+            debugPrint(
+              'Advertencia: raíz ingresada ${widget.totalRaices}, en Firestore ${raicesGuardadas}',
+            );
+            // podrías actualizar widget.totalRaices o notificar al usuario
+          }
+        }
+      });
+    }
   }
 
   Future<void> agregarEvaluacion(int nota) async {
@@ -156,48 +173,36 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
 
   Future<void> guardarEvaluacion() async {
     try {
-      int suma = evaluaciones.entries
-          .map((e) => e.key * e.value)
-          .fold(0, (a, b) => a + b);
+      int totalEvaluadas = evaluaciones.values.fold(0, (a, b) => a + b);
+
+      if (totalEvaluadas != widget.totalRaices) {
+        setState(() {
+          mensaje =
+              "❌ La cantidad evaluada ($totalEvaluadas) no coincide con raíces a evaluar (${widget.totalRaices}).";
+        });
+        return; // No permitas guardar si no coinciden
+      }
 
       double frecuencia =
-          widget.totalRaices == 0 ? 0.0 : suma / (widget.totalRaices * 7);
+          widget.totalRaices == 0
+              ? 0.0
+              : totalEvaluadas / (widget.totalRaices * 7);
 
       await widget.parcelaRef.update({
         "evaluacion": evaluaciones.map(
           (key, value) => MapEntry(key.toString(), value),
         ),
         "frecuencia_relativa": double.parse(frecuencia.toStringAsFixed(3)),
+        // NO toques "raicesA" aquí
       });
 
       await player.play(AssetSource('sounds/done.mp3'));
 
-      if (context.mounted) {
-        showDialog(
-          context: context,
-          builder:
-              (_) => AlertDialog(
-                title: const Text("✅ Guardado exitoso"),
-                content: const Text(
-                  "La evaluación ha sido guardada correctamente.",
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // solo cierra modal
-                    },
-                    child: const Text("Aceptar"),
-                  ),
-                ],
-              ),
-        );
+      setState(() {
+        evaluacionGuardada = true;
+      });
 
-        setState(() {
-          evaluacionGuardada = true;
-        });
-      }
-
-      await cargarEvaluacionDesdeFirestore(); // Refresca evaluación
+      await cargarEvaluacionDesdeFirestore(); // Opcional
     } catch (e) {
       setState(() => mensaje = "❌ Error al guardar: $e");
     }
@@ -307,39 +312,13 @@ class _EvaluacionDanoScreenState extends State<EvaluacionDanoScreen> {
       appBar: AppBar(
         backgroundColor: const Color.fromARGB(255, 0, 0, 0),
         leading: IconButton(
-          icon: const Icon(
-            Icons.arrow_back,
-            color: Color.fromARGB(255, 255, 255, 255),
-          ),
-          onPressed: () {
-            if (evaluacionGuardada) {
-              Navigator.of(context).pop();
-            } else {
-              showDialog(
-                context: context,
-                builder:
-                    (_) => AlertDialog(
-                      title: const Text("¿Retroceder sin guardar cambios?"),
-                      content: const Text("Perderás los datos no guardados."),
-                      actions: [
-                        TextButton(
-                          onPressed:
-                              () => Navigator.of(context).pop(), // Cierra modal
-                          child: const Text("Cancelar"),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop(); // Cierra modal
-                            Navigator.of(context).pop(); // Retrocede
-                          },
-                          child: const Text("Salir sin guardar"),
-                        ),
-                      ],
-                    ),
-              );
-            }
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () async {
+            await guardarEvaluacion();
+            if (context.mounted) Navigator.of(context).pop('guardado');
           },
         ),
+
         title: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [

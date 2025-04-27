@@ -74,7 +74,7 @@ class AdminDashboard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 30),
+            const SizedBox(height: 40),
             ElevatedButton.icon(
               onPressed: () async {
                 await FirebaseAuth.instance.signOut();
@@ -91,7 +91,7 @@ class AdminDashboard extends StatelessWidget {
                   vertical: 14,
                 ),
                 textStyle: const TextStyle(
-                  fontSize: 18,
+                  fontSize: 16,
                   fontWeight: FontWeight.bold,
                 ),
                 shape: RoundedRectangleBorder(

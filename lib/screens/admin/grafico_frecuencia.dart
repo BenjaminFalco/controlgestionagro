@@ -95,7 +95,9 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 
     final nombreCiudad = ciudadDoc.data()?['nombre'] ?? 'Ciudad';
     final nombreSerie = serieDoc.data()?['nombre'] ?? 'Serie';
-    final superficie = serieDoc.data()?['superficie'] ?? '';
+    final rawSuperficie = serieDoc.data()?['superficie'];
+    final superficie = num.tryParse(rawSuperficie.toString()) ?? 0;
+
     final fechaCosecha = serieDoc.data()?['fecha_cosecha']?.toDate();
     final fechaCreacion = serieDoc.data()?['fecha_creacion']?.toDate();
 
@@ -130,14 +132,22 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
 
       for (var parcelaDoc in parcelasSnap.docs) {
         final data = parcelaDoc.data();
-        final numeroFicha = data['numero_ficha'] ?? 0;
-        final numeroTratamiento = data['numero_tratamiento'] ?? 0;
+        final numeroFicha =
+            data.containsKey('numero_ficha') ? data['numero_ficha'] : 0;
+        final numeroTratamiento =
+            data.containsKey('numero_tratamiento')
+                ? data['numero_tratamiento']
+                : 0;
 
         final tratamientoSnap =
             await parcelaDoc.reference
                 .collection('tratamientos')
                 .doc('actual')
                 .get();
+
+        // ✅ Validación clave agregada
+        if (!tratamientoSnap.exists) continue;
+
         final tratamiento = tratamientoSnap.data() ?? {};
 
         final pesoA = double.tryParse(tratamiento['pesoA'] ?? '0') ?? 0;
@@ -147,14 +157,12 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
         final ndvi = tratamiento['ndvi'] ?? '';
         final observaciones = tratamiento['observaciones'] ?? '';
 
-        // ✅ Cargar evaluación desde campo directo en "parcelas"
         final evaluacionMap = data['evaluacion'] ?? {};
         final frecNotas = List<int>.generate(
           8,
           (i) => (evaluacionMap['$i'] ?? 0) as int,
         );
 
-        // ✅ Sumar a frecuencia general
         for (int i = 0; i <= 7; i++) {
           frecuenciaNotas[i] = (frecuenciaNotas[i] ?? 0) + frecNotas[i];
         }
@@ -162,7 +170,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
         todasLasParcelas.add(
           _DatoParcela(
             numeroFicha: numeroFicha,
-            fechaCosecha: fechaCreacion,
+            fechaCosecha: fechaCosecha ?? fechaCreacion,
             nombreSerie: nombreSerie,
             nombreCiudad: nombreCiudad,
             superficie: superficie,
@@ -254,8 +262,20 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                 .get();
 
         for (final parcela in parcelasSnapshot.docs) {
-          final numeroFicha = parcela['numero_ficha'] ?? '';
-          final numeroTratamiento = parcela['numero_tratamiento'] ?? '';
+          final docData = Map<String, dynamic>.from(parcela.data());
+
+          // ✅ Corrige campos que pueden estar ausentes
+          final numeroFicha =
+              docData.containsKey('numero_ficha') &&
+                      docData['numero_ficha'] != null
+                  ? docData['numero_ficha']
+                  : 0;
+
+          final numeroTratamiento =
+              docData.containsKey('numero_tratamiento') &&
+                      docData['numero_tratamiento'] != null
+                  ? docData['numero_tratamiento']
+                  : 0;
 
           final tratamientosSnap =
               await parcela.reference
@@ -278,8 +298,11 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
           final ndvi = data['ndvi'] ?? '';
           final observaciones = data['observaciones'] ?? '';
 
-          // 👇 Extraer directamente desde el campo "evaluacion" en la parcela
-          Map<String, dynamic> frecuencias = parcela['evaluacion'] ?? {};
+          final frecuencias =
+              docData.containsKey('evaluacion') && docData['evaluacion'] != null
+                  ? Map<String, dynamic>.from(docData['evaluacion'])
+                  : {};
+
           List<int> quinlei = List.generate(8, (i) => frecuencias['$i'] ?? 0);
           final totalEvaluadas = quinlei.fold(0, (sum, val) => sum + val);
 
@@ -290,7 +313,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                 : '',
             nombreSerie,
             nombreCiudad,
-            "10",
+            "10", // Puedes reemplazar por valor real si lo necesitas
             bloqueNombre,
             numeroTratamiento,
             totalRaices,
@@ -299,7 +322,7 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
             ndvi,
             observaciones,
             ...quinlei,
-            totalEvaluadas, // 👈 columna final Total
+            totalEvaluadas,
           ]);
         }
       }
@@ -310,8 +333,12 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
               .replaceAll("/", "-") +
           ".xlsx";
 
-      // 📂 Guardar en carpeta de descargas pública (Android)
-      final directory = Directory('/storage/emulated/0/Download');
+      final directory = await getExternalStorageDirectory(); // ✅ Ruta segura
+
+      if (directory == null) {
+        throw Exception("No se pudo acceder al almacenamiento externo");
+      }
+
       if (!await directory.exists()) {
         await directory.create(recursive: true);
       }
@@ -603,7 +630,10 @@ class _GraficoFrecuenciaState extends State<GraficoFrecuencia> {
                                         ),
                                         DataCell(Text(p.nombreSerie)),
                                         DataCell(Text(p.nombreCiudad)),
-                                        DataCell(Text(p.superficie ?? '')),
+                                        DataCell(
+                                          Text("${p.superficie.toString()} m²"),
+                                        ),
+
                                         DataCell(Text(p.nombreBloque)),
                                         DataCell(
                                           Text(p.numeroTratamiento.toString()),
@@ -707,7 +737,8 @@ class _DatoParcela {
   final DateTime? fechaCosecha; // ✅ AÑADIDO
   final String nombreSerie;
   final String nombreCiudad;
-  final String? superficie;
+  final num superficie;
+
   final String nombreBloque;
   final int numeroTratamiento;
   final double pesoRaices;

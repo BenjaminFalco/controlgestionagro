@@ -9,6 +9,18 @@ class CrearSerie extends StatefulWidget {
 }
 
 class _CrearSerieState extends State<CrearSerie> {
+  bool isLoading = false;
+  String mensajeTemporal = '';
+
+  bool get sePuedeCrear =>
+      !isLoading &&
+      nombreSerieController.text.trim().isNotEmpty &&
+      ciudadSeleccionada != null &&
+      (usarSerieExistente
+          ? ciudadReferencia != null && serieReferencia != null
+          : cantidadParcelasController.text.trim().isNotEmpty &&
+              cantidadBloquesController.text.trim().isNotEmpty);
+
   final TextEditingController nombreSerieController = TextEditingController();
   final TextEditingController cantidadParcelasController =
       TextEditingController();
@@ -31,6 +43,11 @@ class _CrearSerieState extends State<CrearSerie> {
   void initState() {
     super.initState();
     cargarCiudades();
+
+    // 🔄 Escuchar los controladores
+    nombreSerieController.addListener(() => setState(() {}));
+    cantidadBloquesController.addListener(() => setState(() {}));
+    cantidadParcelasController.addListener(() => setState(() {}));
   }
 
   Future<void> cargarCiudades() async {
@@ -199,6 +216,52 @@ class _CrearSerieState extends State<CrearSerie> {
         }
       }
     }
+  }
+
+  Widget crearMatrizButton() {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed:
+            sePuedeCrear
+                ? () async {
+                  setState(() => isLoading = true);
+                  await crearSerie(); // este método ya está definido en tu clase
+                  setState(() => isLoading = false);
+                }
+                : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: const Color(0xFF00B140),
+          foregroundColor: Colors.white,
+          textStyle: const TextStyle(fontSize: 18),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(10),
+          ),
+        ),
+        child:
+            isLoading
+                ? const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white,
+                      ),
+                    ),
+                    SizedBox(width: 12),
+                    Text(
+                      "CARGANDO MATRIZ...",
+                      style: TextStyle(color: Colors.white),
+                    ),
+                  ],
+                )
+                : const Text("Crear Matriz"),
+      ),
+    );
   }
 
   Future<void> crearSerie() async {
@@ -445,19 +508,7 @@ class _CrearSerieState extends State<CrearSerie> {
                 ],
 
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: crearSerie,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF00B140),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    textStyle: const TextStyle(fontSize: 18),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                  ),
-                  child: const Text("Crear Matriz"),
-                ),
+                crearMatrizButton(),
                 const SizedBox(height: 16),
                 ElevatedButton.icon(
                   onPressed:
