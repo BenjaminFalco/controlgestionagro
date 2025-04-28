@@ -397,11 +397,11 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
         for (final bloque in bloquesSnap.docs) {
           final bloqueId = bloque.id;
-          final nombreBloque =
-              (bloque.data() as Map<String, dynamic>)['nombre'] ?? '...';
+          final bloqueData = bloque.data();
+          final nombreBloque = bloqueData['nombre'] ?? '...';
 
+          // 🔥 Guardamos el nombre del bloque
           nombresBloques[bloqueId] = nombreBloque;
-
           bloquesParaHive.add({'id': bloqueId, 'nombre': nombreBloque});
 
           final parcelasSnap =
@@ -415,18 +415,20 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
             data['id'] = p.id;
             data['bloque'] = bloqueId;
             parcelasParaHive.add(data);
-            todasParcelas.add(p);
+            todasParcelas.add(
+              p,
+            ); // 🔥 Aquí agregamos TODAS las parcelas de TODOS los bloques
           }
         }
 
-        // Guardar respaldo en Hive
+        // Guardamos respaldo en Hive
         await box.put(claveBloques, bloquesParaHive);
         await box.put(claveParcelas, parcelasParaHive);
       } catch (e) {
         print("❌ Error online al cargar parcelas: $e");
       }
     } else {
-      // Cargar desde Hive
+      // 📴 Modo offline
       final bloquesOffline = box.get(claveBloques) ?? [];
       final parcelasOffline = box.get(claveParcelas) ?? [];
 
@@ -437,12 +439,19 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
       todasParcelas = parcelasOffline;
     }
 
+    // 🔥 Buscamos la posición exacta combinando bloque y número de parcela
     final index = todasParcelas.indexWhere((p) {
       final data =
           (p is DocumentSnapshot)
               ? p.data() as Map<String, dynamic>?
               : p as Map<String, dynamic>;
-      return data?['numero'] == widget.parcelaDesde;
+
+      final bloque =
+          (p is DocumentSnapshot) ? p.reference.parent.parent?.id : p['bloque'];
+
+      return bloque == widget.bloqueId &&
+          int.tryParse(data?['numero']?.toString() ?? '') ==
+              widget.parcelaDesde;
     });
 
     setState(() {
