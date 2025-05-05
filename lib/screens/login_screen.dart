@@ -86,6 +86,7 @@ class _LoginScreenState extends State<LoginScreen> {
           rol: userData['rol'] ?? '',
           nombre: userData['nombre'] ?? '',
           ciudad: userData['ciudad'] ?? '',
+          password: passwordController.text.trim(), // ✅ agregado
         );
         await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
 
@@ -155,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
           rol: data['rol'] ?? '',
           nombre: data['nombre'] ?? '',
           ciudad: data['ciudad'] ?? '',
+          password: '', // ✅ agregado, valor vacío
         );
         await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
 

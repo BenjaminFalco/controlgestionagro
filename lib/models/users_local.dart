@@ -4,6 +4,7 @@ class UsuarioLocal {
   final String rol;
   final String nombre;
   final String ciudad;
+  final String password; // ✅ nuevo campo agregado
 
   UsuarioLocal({
     required this.uid,
@@ -11,6 +12,7 @@ class UsuarioLocal {
     required this.rol,
     required this.nombre,
     required this.ciudad,
+    required this.password, // ✅ incluir en el constructor
   });
 
   Map<String, dynamic> toMap() => {
@@ -19,6 +21,7 @@ class UsuarioLocal {
     'rol': rol,
     'nombre': nombre,
     'ciudad': ciudad,
+    'password': password, // ✅ incluir en el mapa
   };
 
   static UsuarioLocal fromMap(Map<String, dynamic> map) => UsuarioLocal(
@@ -27,5 +30,6 @@ class UsuarioLocal {
     rol: map['rol'],
     nombre: map['nombre'],
     ciudad: map['ciudad'],
+    password: map['password'], // ✅ incluir al reconstruir
   );
 }
