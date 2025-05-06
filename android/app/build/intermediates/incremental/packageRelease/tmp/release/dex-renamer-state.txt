@@ -1,4 +1,4 @@
-#Sun May 04 22:00:18 CLT 2025
+#Mon May 05 11:04:41 CLT 2025
 base.0=C\:\\Users\\Patricio Arias\\Desktop\\controlgestion\\controlgestionagro\\android\\app\\build\\intermediates\\dex\\release\\mergeDexRelease\\classes.dex
 base.1=C\:\\Users\\Patricio Arias\\Desktop\\controlgestion\\controlgestionagro\\android\\app\\build\\intermediates\\global_synthetics_dex\\release\\mergeReleaseGlobalSynthetics\\classes.dex
 base.2=C\:\\Users\\Patricio Arias\\Desktop\\controlgestion\\controlgestionagro\\android\\app\\build\\intermediates\\dex\\release\\mergeDexRelease\\classes2.dex

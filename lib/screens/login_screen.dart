@@ -34,6 +34,39 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _cargarUsuariosRecientes();
+    _verificarUsuarioOperadorPersistido(); // 👈 Agregamos esta verificación
+  }
+
+  void _verificarUsuarioOperadorPersistido() async {
+    final userBox = Hive.box('offline_user');
+    final usuario = userBox.get('usuario_actual');
+
+    if (usuario != null && usuario['rol'] == 'operador') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const InicioTratamientoScreen()),
+      );
+    }
+  }
+
+  Future<UsuarioLocal?> obtenerUsuarioActual() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    final box = Hive.box('offline_user');
+
+    if (connectivity == ConnectivityResult.none) {
+      // 🔌 Sin conexión: usar datos de Hive
+      final usuario = box.get('usuario_actual');
+      if (usuario != null) return UsuarioLocal.fromMap(usuario);
+    } else {
+      // 🌐 Online: usar usuario activo de Firebase
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        final usuario = box.get('usuario_actual');
+        if (usuario != null) return UsuarioLocal.fromMap(usuario);
+      }
+    }
+
+    return null; // No hay usuario válido
   }
 
   Future<void> _cargarUsuariosRecientes() async {
@@ -298,35 +331,72 @@ class _LoginScreenState extends State<LoginScreen> {
 
               ElevatedButton.icon(
                 onPressed: () async {
-                  final currentUser = FirebaseAuth.instance.currentUser;
+                  final box = Hive.box('offline_user');
+                  final usuario = box.get('usuario_actual');
 
-                  if (currentUser == null) {
-                    try {
-                      // 🔵 Solo crea un usuario anónimo si NO hay uno ya.
-                      await FirebaseAuth.instance.signInAnonymously();
-                    } catch (e) {
-                      print('❌ Error al iniciar sesión anónima: $e');
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Error al iniciar sesión anónima'),
-                        ),
-                      );
-                      return;
-                    }
-                  } else if (!currentUser.isAnonymous) {
-                    // 🔴 Si existe un usuario pero no es anónimo, podrías cerrar sesión si quieres forzar modo operador
-                    await FirebaseAuth.instance.signOut();
-                    await FirebaseAuth.instance.signInAnonymously();
+                  // ✅ Si Hive tiene un usuario operador, usarlo y salir
+                  if (usuario != null && usuario['rol'] == 'operador') {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const InicioTratamientoScreen(),
+                      ),
+                    );
+                    return;
                   }
 
-                  // 🔵 Ahora, sí o sí hay un usuario anónimo activo. Vamos a InicioTratamientoScreen.
-                  Navigator.pushReplacement(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const InicioTratamientoScreen(),
-                    ),
-                  );
+                  // 🔍 Si no está en Hive, pero sí hay un usuario anónimo activo, usarlo y guardarlo en Hive
+                  final currentUser = FirebaseAuth.instance.currentUser;
+                  if (currentUser != null && currentUser.isAnonymous) {
+                    final usuarioLocal = UsuarioLocal(
+                      uid: currentUser.uid,
+                      email: 'anonimo@operador.com',
+                      rol: 'operador',
+                      nombre: 'Usuario Operador',
+                      ciudad: '',
+                      password: '',
+                    );
+                    await box.put('usuario_actual', usuarioLocal.toMap());
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const InicioTratamientoScreen(),
+                      ),
+                    );
+                    return;
+                  }
+
+                  // ⚠️ Solo si no hay Hive ni usuario anónimo activo, creamos uno nuevo
+                  try {
+                    final cred =
+                        await FirebaseAuth.instance.signInAnonymously();
+                    final user = cred.user!;
+
+                    final usuarioLocal = UsuarioLocal(
+                      uid: user.uid,
+                      email: 'anonimo@operador.com',
+                      rol: 'operador',
+                      nombre: 'Usuario Operador',
+                      ciudad: '',
+                      password: '',
+                    );
+                    await box.put('usuario_actual', usuarioLocal.toMap());
+
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const InicioTratamientoScreen(),
+                      ),
+                    );
+                  } catch (e) {
+                    print('❌ Error al crear usuario anónimo: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Error al iniciar sesión')),
+                    );
+                  }
                 },
+
                 icon: const Icon(Icons.play_arrow),
                 label: const Text("Operador", style: TextStyle(fontSize: 40)),
                 style: ElevatedButton.styleFrom(

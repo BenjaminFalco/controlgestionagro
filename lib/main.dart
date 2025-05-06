@@ -34,17 +34,33 @@ void main() async {
   await Hive.initFlutter();
   await Hive.openBox('offline_data');
   await Hive.openBox('user_data');
-  await Hive.openBox('offline_user'); // <- agrega esta
+  await Hive.openBox('offline_user'); // <- caja clave
 
-  //data inicio_tratamiento
+  // 🔹 Data para inicio_tratamiento
   await Hive.openBox('offline_ciudades');
   await Hive.openBox('offline_series');
   await Hive.openBox('offline_bloques');
   await Hive.openBox('offline_parcelas');
+  await Hive.openBox('offline_tratamientos');
 
-  await Hive.openBox(
-    'offline_tratamientos',
-  ); // ✅ NECESARIO para FormularioTratamiento
+  // 🔐 Persistencia UID anónimo si es que existe en Auth pero no está en Hive
+  final userBox = Hive.box('offline_user');
+  final currentUser = FirebaseAuth.instance.currentUser;
+  final guardado = userBox.get('usuario_actual');
+
+  if (currentUser != null && currentUser.isAnonymous && guardado == null) {
+    // 🔐 Persistimos el usuario anónimo activo en Hive
+    await userBox.put('usuario_actual', {
+      'uid': currentUser.uid,
+      'email': 'anonimo@operador.com',
+      'rol': 'operador',
+      'nombre': 'Usuario Operador',
+      'ciudad': '',
+      'password': '',
+    });
+
+    print('✅ UID anónimo recuperado y persistido: ${currentUser.uid}');
+  }
 
   // 🔹 Monitorea la conexión
   monitorConexion();
@@ -107,17 +123,37 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: FirebaseAuth.instance.authStateChanges(),
+    return FutureBuilder(
+      future: _determinarPantallaInicial(),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const LoadingScreen();
-        } else if (snapshot.hasData) {
-          return const SetupScreen();
-        } else {
-          return const LoginScreen();
         }
+
+        if (snapshot.hasData) {
+          return snapshot.data as Widget;
+        }
+
+        return const LoginScreen(); // fallback en caso de error
       },
     );
+  }
+
+  Future<Widget> _determinarPantallaInicial() async {
+    final user = FirebaseAuth.instance.currentUser;
+    final box = await Hive.openBox('offline_user');
+    final usuario = box.get('usuario_actual');
+
+    if (user != null && user.isAnonymous && usuario?['rol'] == 'operador') {
+      // 🔁 Usuario anónimo y operador persistido → ir a inicio tratamiento
+      return const InicioTratamientoScreen();
+    }
+
+    if (user != null) {
+      // Usuario con cuenta → ir a SetupScreen para verificar datos
+      return const SetupScreen();
+    }
+
+    return const LoginScreen();
   }
 }

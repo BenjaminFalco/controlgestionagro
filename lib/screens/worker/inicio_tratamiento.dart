@@ -525,7 +525,9 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             icon: const Icon(Icons.logout, color: Colors.black),
             tooltip: "Cerrar sesión",
             onPressed: () async {
-              await FirebaseAuth.instance.signOut();
+              final userBox = Hive.box('offline_user');
+              await userBox.delete('usuario_actual');
+
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
                   context,

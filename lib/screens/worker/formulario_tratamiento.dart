@@ -221,7 +221,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
       if (currentIndex > 0) {
         await Future.delayed(
-          const Duration(milliseconds: 500),
+          const Duration(milliseconds: 800),
         ); // ⏳ Pequeño delay visual
         setState(() {
           currentIndex--;
@@ -249,7 +249,7 @@ class _FormularioTratamientoState extends State<FormularioTratamiento> {
 
       if (currentIndex < parcelas.length - 1) {
         await Future.delayed(
-          const Duration(milliseconds: 500),
+          const Duration(milliseconds: 800),
         ); // ⏳ Pequeño delay visual
         setState(() {
           currentIndex++;
