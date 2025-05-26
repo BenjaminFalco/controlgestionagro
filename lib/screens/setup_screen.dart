@@ -1,8 +1,12 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:controlgestionagro/models/users_local.dart';
+import 'package:controlgestionagro/services/global_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'admin/admin_dashboard.dart';
 import 'worker/worker_dashboard.dart';
+import 'package:sqflite/sqflite.dart';
+
 import 'login_screen.dart';
 
 class SetupScreen extends StatefulWidget {
@@ -17,11 +21,37 @@ class _SetupScreenState extends State<SetupScreen> {
   final TextEditingController phoneController = TextEditingController();
   String selectedRole = 'trabajador';
   String errorMessage = '';
+  String ciudadSeleccionada = '';
 
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _cargarDatosIniciales();
+  }
+
+  Future<void> _cargarDatosIniciales() async {
+    final usuario = await getUsuarioLocal();
+    if (usuario != null) {
+      final TextEditingController nameController = TextEditingController();
+      ciudadSeleccionada = usuario.ciudad;
+      // etc.
+    }
+  }
+
+  Future<UsuarioLocal?> getUsuarioLocal() async {
+    final db = GlobalServices.syncService.db;
+
+    try {
+      final result = await db.query('usuarios_locales', limit: 1);
+      if (result.isNotEmpty) {
+        return UsuarioLocal.fromMap(result.first);
+      }
+    } catch (e) {
+      print('❌ Error obteniendo usuario local: $e');
+    }
+
+    return null;
   }
 
   Future<void> _loadUserData() async {
@@ -50,14 +80,35 @@ class _SetupScreenState extends State<SetupScreen> {
   Future<void> saveUserInfo() async {
     try {
       String uid = FirebaseAuth.instance.currentUser!.uid;
+      final email = FirebaseAuth.instance.currentUser?.email ?? '';
 
+      final nombre = nameController.text.trim();
+
+      // 🔄 Guardar en Firestore
       await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
-        "nombre": nameController.text.trim(),
+        "nombre": nombre,
         "rol": selectedRole,
       }, SetOptions(merge: true));
 
       print("✅ Datos guardados en Firestore correctamente.");
 
+      // ✅ Guardar también en SQLite
+      final usuarioLocal = UsuarioLocal(
+        uid: uid,
+        email: email,
+        rol: selectedRole,
+        nombre: nombre,
+        ciudad: '', // puedes completarlo si luego agregas ciudad
+        password: '', // no aplica aquí
+      );
+
+      await GlobalServices.syncService.db.insert(
+        'usuarios_locales',
+        usuarioLocal.toMap()..['timestamp'] = DateTime.now().toIso8601String(),
+        conflictAlgorithm: ConflictAlgorithm.replace,
+      );
+
+      // 🔄 Navegación posterior al guardado
       if (selectedRole == "admin") {
         Navigator.pushReplacement(
           context,

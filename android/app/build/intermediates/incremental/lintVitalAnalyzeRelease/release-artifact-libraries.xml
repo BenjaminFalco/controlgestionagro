@@ -134,6 +134,20 @@
       externalAnnotations="annotations.zip"
       proguardRules="proguard.txt"/>
   <library
+      name=":@@:sqflite_android::release"
+      jars="C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\4046f91af2fcc30244eb07fa95951244\transformed\out\jars\classes.jar;C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\4046f91af2fcc30244eb07fa95951244\transformed\out\jars\libs\R.jar"
+      resolved="com.tekartik.sqflite:sqflite_android:1.0-SNAPSHOT"
+      partialResultsDir="C:\Users\Patricio Arias\AppData\Local\Pub\Cache\hosted\pub.dev\sqflite_android-2.4.1\android\build\intermediates\lint_vital_partial_results\release\lintVitalAnalyzeRelease\out"
+      folder="C:\Users\Patricio Arias\.gradle\caches\8.10.2\transforms\4046f91af2fcc30244eb07fa95951244\transformed\out"
+      manifest="AndroidManifest.xml"
+      resFolder="res"
+      assetsFolder="assets"
+      lintJar="lint.jar"
+      publicResources="public.txt"
+      symbolFile="R.txt"
+      externalAnnotations="annotations.zip"
+      proguardRules="proguard.txt"/>
+  <library
       name="io.flutter:flutter_embedding_release:1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434@jar"
       jars="C:\Users\Patricio Arias\.gradle\caches\modules-2\files-2.1\io.flutter\flutter_embedding_release\1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434\e1f965c14eb9a096111654ae1a59480778f50cbc\flutter_embedding_release-1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434.jar"
       resolved="io.flutter:flutter_embedding_release:1.0.0-18b71d647a292a980abb405ac7d16fe1f0b20434"/>

@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:controlgestionagro/services/global_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'formulario_tratamiento.dart';
@@ -8,6 +9,8 @@ import 'package:uuid/uuid.dart';
 import 'package:controlgestionagro/models/tratamiento_local.dart';
 import 'package:controlgestionagro/services/offline_sync_service.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:controlgestionagro/models/users_local.dart';
+import 'package:controlgestionagro/services/global_services.dart';
 
 class InicioTratamientoScreen extends StatefulWidget {
   const InicioTratamientoScreen({super.key});
@@ -23,6 +26,11 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   String? bloqueSeleccionado;
   String? parcelaSeleccionada;
 
+  UsuarioLocal? usuarioActual;
+  // ⬅️ Variable de instancia en tu clase State
+  String uid =
+      'default'; // ⬅️ Ya declarada en tu State (según lo que mencionas)
+
   List<dynamic> ciudades = [];
   List<dynamic> series = [];
   List<String> bloques = [];
@@ -37,22 +45,218 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
   @override
   void initState() {
     super.initState();
-    cargarCiudades();
+    cargarTodoAlInicio();
+  }
+
+  Future<void> cargarTodoAlInicio() async {
+    final hayConexion = await _hasConexion();
+    final db = GlobalServices.syncService.db;
+
+    if (hayConexion) {
+      // 🔹 1. Sincronizar ciudades
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'ciudades',
+        tableName: 'ciudades',
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'ciudadId': doc.id,
+              'nombre': doc['nombre'] ?? '',
+              'fecha_creacion': doc['fecha_creacion']?.toString() ?? '',
+            },
+      );
+    }
+
+    final ciudadesRes = await db.query('ciudades');
+    final ciudad = ciudadesRes.isNotEmpty ? ciudadesRes.first : null;
+    if (ciudad == null) return;
+    final ciudadId = ciudad['ciudadId'] as String;
+    ciudadSeleccionada = ciudadId;
+
+    // 🔹 2. Sincronizar series (si hay conexión)
+    if (hayConexion) {
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'ciudades/$ciudadId/series',
+        tableName: 'series',
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'serieId': doc.id,
+              'ciudadId': ciudadId,
+              'nombre': doc['nombre'] ?? '',
+              'superficie': (doc['superficie'] ?? 10).toDouble(),
+              'fecha_creacion': doc['fecha_creacion']?.toString() ?? '',
+              'fecha_cosecha': doc['fecha_cosecha']?.toString() ?? '',
+              'matriz_alto': doc['matriz_alto'] ?? 0,
+              'matriz_largo': doc['matriz_largo'] ?? 0,
+            },
+      );
+    }
+
+    final seriesRes = await db.query(
+      'series',
+      where: 'ciudadId = ?',
+      whereArgs: [ciudadId],
+    );
+
+    final serieId =
+        seriesRes.isNotEmpty ? seriesRes.first['serieId'] as String : null;
+
+    List<Map<String, Object?>> bloquesRes = [];
+    List<Map<String, Object?>> parcelasRes = [];
+    String? bloqueId;
+    String? parcelaId;
+
+    if (serieId != null) {
+      if (hayConexion) {
+        await GlobalServices.syncService.fetchAndCacheCollection(
+          firestorePath: 'ciudades/$ciudadId/series/$serieId/bloques',
+          tableName: 'bloques',
+          docIdFn: (doc) => doc.id,
+          mapFn:
+              (doc) => {
+                'bloqueId': doc.id,
+                'serieId': serieId,
+                'nombre': doc['nombre'] ?? '',
+              },
+        );
+      }
+
+      bloquesRes = await db.query(
+        'bloques',
+        where: 'serieId = ?',
+        whereArgs: [serieId],
+      );
+
+      if (bloquesRes.isNotEmpty) {
+        bloqueId = bloquesRes.first['bloqueId'] as String;
+
+        if (hayConexion) {
+          await GlobalServices.syncService.fetchAndCacheCollection(
+            firestorePath:
+                'ciudades/$ciudadId/series/$serieId/bloques/$bloqueId/parcelas',
+            tableName: 'parcelas',
+            docIdFn: (doc) => doc.id,
+            mapFn:
+                (doc) => {
+                  'parcelaId': doc.id,
+                  'bloqueId': bloqueId,
+                  'numero': doc['numero'] ?? 0,
+                  'numero_tratamiento': doc['numero_tratamiento'] ?? 0,
+                  'numero_ficha': doc['numero_ficha'] ?? '',
+                  'tratamiento': (doc['tratamiento'] ?? false) ? 1 : 0,
+                  'trabajador_id': doc['trabajador_id'] ?? '',
+                  'total_raices': doc['total_raices'] ?? 0,
+                },
+          );
+        }
+
+        parcelasRes = await db.query(
+          'parcelas',
+          where: 'bloqueId = ?',
+          whereArgs: [bloqueId],
+        );
+
+        if (parcelasRes.isNotEmpty) {
+          parcelaId = parcelasRes.first['parcelaId'] as String;
+        }
+      }
+
+      print('📍 ciudades: ${ciudades.length}');
+      print('📍 series: ${series.length}');
+      print('📍 bloques: ${bloques.length}');
+      print('📍 parcelas: ${parcelas.length}');
+      print('📍 ciudadSeleccionada: $ciudadSeleccionada');
+      print('📍 serieSeleccionada: $serieSeleccionada');
+      print('📍 bloqueSeleccionado: $bloqueSeleccionado');
+      print('📍 parcelaSeleccionada: $parcelaSeleccionada');
+    }
+
+    // ✅ setState final, independiente de si hay series o bloques
+    setState(() {
+      ciudadSeleccionada = ciudadId;
+      serieSeleccionada = serieId;
+      bloqueSeleccionado = bloqueId;
+      parcelaSeleccionada = parcelaId;
+
+      ciudades =
+          ciudadesRes
+              .map((e) => QueryDocumentSnapshotFake(e['ciudadId'] as String, e))
+              .toList();
+      series =
+          seriesRes
+              .map((e) => QueryDocumentSnapshotFake(e['serieId'] as String, e))
+              .toList();
+      bloques = bloquesRes.map((e) => e['bloqueId'].toString()).toList();
+      parcelas =
+          parcelasRes
+              .map(
+                (e) => QueryDocumentSnapshotFake(e['parcelaId'] as String, e),
+              )
+              .toList();
+    });
+
+    if (hayConexion) {
+      await sincronizarTodoDesdeInicioTratamiento();
+    }
+  }
+
+  Future<UsuarioLocal?> getUsuarioLocal() async {
+    final db = GlobalServices.syncService.db;
+
+    try {
+      final result = await db.query('usuarios_locales', limit: 1);
+      if (result.isNotEmpty) {
+        return UsuarioLocal.fromMap(result.first);
+      }
+    } catch (e) {
+      print('❌ Error obteniendo usuario local: $e');
+    }
+
+    return null;
+  }
+
+  Future<void> obtenerUidUsuario() async {
+    final usuario = await getUsuarioLocal();
+
+    setState(() {
+      usuarioActual = usuario;
+      uid = usuario?.uid ?? 'default';
+    });
+  }
+
+  Future<bool> _hasConexion() async {
+    final result = await Connectivity().checkConnectivity();
+    return result != ConnectivityResult.none;
   }
 
   Future<void> guardarSuperficieEnSerie() async {
     if (ciudadSeleccionada == null || serieSeleccionada == null) return;
 
+    final usuario = await getUsuarioLocal();
+    final uid = usuario?.uid ?? 'default';
+
     final superficie = superficieController.text.trim();
-    final box = Hive.box('offline_series');
-    final key = 'series_$ciudadSeleccionada';
+    final db = GlobalServices.syncService.db;
+    final hayConexion = await _hasConexion();
 
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
+    try {
+      // 🔁 Actualiza localmente en SQLite (sincronización pendiente)
+      await db.update(
+        'series',
+        {
+          'superficie': superficie,
+          'isSynced': 0,
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+        where: 'serieId = ?',
+        whereArgs: [serieSeleccionada, ciudadSeleccionada],
+      );
 
-    if (hayConexion) {
-      try {
-        // 🔄 Actualiza en Firestore
+      print("✅ Superficie guardada localmente en SQLite");
+
+      if (hayConexion) {
+        // 🔁 Actualiza también en Firestore
         await FirebaseFirestore.instance
             .collection('ciudades')
             .doc(ciudadSeleccionada!)
@@ -60,248 +264,277 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             .doc(serieSeleccionada!)
             .update({'superficie': superficie});
 
-        // 🔄 También actualiza en Hive
-        final lista = box.get(key) ?? [];
-        final actualizada =
-            (lista as List).map((e) {
-              if (e['id'] == serieSeleccionada) {
-                return {...e, 'superficie': superficie};
-              }
-              return e;
-            }).toList();
-        await box.put(key, actualizada);
-      } catch (e) {
-        print("❌ Error al guardar superficie online: $e");
+        // ✅ Marca como sincronizado
+        await db.update(
+          'series',
+          {'isSynced': 1},
+          where: 'serieId = ? ',
+          whereArgs: [serieSeleccionada, ciudadSeleccionada],
+        );
+
+        print("✅ Superficie sincronizada con Firestore");
       }
-    } else {
-      // 📴 Modo offline: guarda solo en Hive
-      final lista = box.get(key) ?? [];
-      final actualizada =
-          (lista as List).map((e) {
-            if (e['id'] == serieSeleccionada) {
-              return {...e, 'superficie': superficie};
-            }
-            return e;
-          }).toList();
-      await box.put(key, actualizada);
-      print("📦 Superficie guardada en Hive offline.");
+    } catch (e) {
+      print("❌ Error al guardar superficie: $e");
+    }
+  }
+
+  Future<void> sincronizarTodoDesdeInicioTratamiento() async {
+    final ciudadId = ciudadSeleccionada;
+
+    if (ciudadId == null || ciudadId.isEmpty) {
+      print('⚠️ No se puede sincronizar sin ciudadId seleccionada');
+      return;
+    }
+
+    final sync = GlobalServices.syncService;
+
+    // 🔄 Sincronizar series de la ciudad seleccionada
+    await sync.sincronizarPendientes(
+      tableName: 'series',
+      idFieldName: 'serieId',
+      parentPathBuilder: (_) => 'ciudades/$ciudadId/series',
+    );
+
+    // 🔄 Sincronizar bloques anidados por serie
+    await sync.sincronizarPendientes(
+      tableName: 'bloques',
+      idFieldName: 'bloqueId',
+      parentPathBuilder:
+          (row) => 'ciudades/$ciudadId/series/${row['serieId']}/bloques',
+    );
+
+    // 🔄 Sincronizar parcelas anidadas por bloque
+    await sync.sincronizarPendientes(
+      tableName: 'parcelas',
+      idFieldName: 'parcelaId',
+      parentPathBuilder:
+          (row) =>
+              'ciudades/$ciudadId/series/${row['serieId']}/bloques/${row['bloqueId']}/parcelas',
+    );
+  }
+
+  Future<void> sincronizarPendientesSeries() async {
+    final connected = await _hasConexion();
+    if (!connected) return;
+
+    final db = GlobalServices.syncService.db;
+    final usuario = await getUsuarioLocal();
+    final uid = usuario?.uid ?? 'default';
+
+    try {
+      final pendientes = await db.query(
+        'series',
+        where: 'isSynced = 0',
+        whereArgs: [uid],
+      );
+
+      for (final row in pendientes) {
+        final ciudadId = row['ciudadId']?.toString() ?? '';
+        final serieId = row['serieId']?.toString() ?? '';
+        final superficie = row['superficie']?.toString() ?? '10';
+
+        try {
+          // 🔁 Actualiza en Firestore
+          await FirebaseFirestore.instance
+              .collection('ciudades')
+              .doc(ciudadId)
+              .collection('series')
+              .doc(serieId)
+              .update({'superficie': superficie});
+
+          // ✅ Marca como sincronizado
+          await db.update(
+            'series',
+            {'isSynced': 1},
+            where: 'serieId = ?',
+            whereArgs: [serieId, ciudadId],
+          );
+
+          print("✅ Sincronizada serie $serieId");
+        } catch (e) {
+          print("❌ Falló sincronización de $serieId: $e");
+        }
+      }
+    } catch (e) {
+      print("❌ Error general al sincronizar series: $e");
     }
   }
 
   Future<void> cargarCiudades() async {
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
-    final box = Hive.box('offline_ciudades');
-    final uid = FirebaseAuth.instance.currentUser?.uid ?? 'default';
+    final hayConexion = await _hasConexion();
+    final table = 'ciudades';
 
     if (hayConexion) {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('ciudades').get();
-      setState(() => ciudades = snapshot.docs);
-
-      final ciudadMapList =
-          snapshot.docs
-              .map((doc) => {'id': doc.id, 'nombre': doc['nombre']})
-              .toList();
-
-      await box.put('ciudades_$uid', ciudadMapList);
-    } else {
-      final local = box.get('ciudades_$uid') ?? [];
-      setState(() => ciudades = List<Map<String, dynamic>>.from(local));
+      //ONLINE
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'ciudades',
+        tableName: table,
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'ciudadId': doc.id,
+              'nombre': doc['nombre'] ?? '',
+              'fecha_creacion': doc['fecha_creacion']?.toString() ?? '',
+            },
+      );
     }
+    //OFFLINE
+    final result = await GlobalServices.syncService.db.query(table);
+    setState(() {
+      ciudades =
+          result
+              .map((e) => QueryDocumentSnapshotFake(e['ciudadId'] as String, e))
+              .toList();
+    });
   }
 
   Future<void> cargarSuperficieDesdeSerie() async {
-    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
+    if (serieSeleccionada == null) return;
 
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
-    final box = Hive.box('offline_series');
+    try {
+      final result = await GlobalServices.syncService.db.query(
+        'series',
+        where: 'serieId = ?',
+        whereArgs: [serieSeleccionada],
+        limit: 1,
+      );
 
-    if (hayConexion) {
-      final doc =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada!)
-              .collection('series')
-              .doc(serieSeleccionada!)
-              .get();
-
-      final data = doc.data();
-      if (data != null && data.containsKey('superficie')) {
-        final superficie = data['superficie'].toString();
+      if (result.isNotEmpty) {
+        final superficie = result.first['superficie']?.toString() ?? '10';
         superficieController.text = superficie;
-
-        // 🔄 Guarda en Hive
-        final lista = box.get('series_$ciudadSeleccionada') ?? [];
-        final actualizada =
-            (lista as List).map((e) {
-              if (e['id'] == serieSeleccionada) {
-                return {...e, 'superficie': superficie};
-              }
-              return e;
-            }).toList();
-        await box.put('series_$ciudadSeleccionada', actualizada);
       } else {
         superficieController.text = '10';
       }
-    } else {
-      // 🔄 Lee desde Hive
-      final lista = box.get('series_$ciudadSeleccionada') ?? [];
-      final serie = (lista as List).firstWhere(
-        (e) => e['id'] == serieSeleccionada,
-        orElse: () => {},
-      );
-      superficieController.text = serie['superficie']?.toString() ?? '10';
+    } catch (e) {
+      print('❌ Error cargando superficie: $e');
+      superficieController.text = '10';
     }
   }
 
   Future<void> cargarSeries() async {
     if (ciudadSeleccionada == null) return;
 
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
-    final box = Hive.box('offline_series');
+    final hayConexion = await _hasConexion();
+    final table = 'series';
 
     if (hayConexion) {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada)
-              .collection('series')
-              .get();
-
-      setState(() => series = snapshot.docs);
-
-      final list =
-          snapshot.docs
-              .map((doc) => {'id': doc.id, 'nombre': doc['nombre']})
-              .toList();
-
-      await box.put('series_$ciudadSeleccionada', list);
-    } else {
-      final local = box.get('series_$ciudadSeleccionada') ?? [];
-      setState(() => series = List<Map<String, dynamic>>.from(local));
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'ciudades/$ciudadSeleccionada/series',
+        tableName: table,
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'serieId': doc.id,
+              'ciudadId': ciudadSeleccionada,
+              'nombre': doc['nombre'] ?? '',
+              'superficie': (doc['superficie'] ?? 10).toDouble(),
+              'fecha_creacion': doc['fecha_creacion']?.toString() ?? '',
+              'fecha_cosecha': doc['fecha_cosecha']?.toString() ?? '',
+              'matriz_alto': doc['matriz_alto'] ?? 0,
+              'matriz_largo': doc['matriz_largo'] ?? 0,
+              'isSynced': 1,
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+      );
     }
+
+    final result = await GlobalServices.syncService.db.query(
+      table,
+      where: 'ciudadId = ?',
+      whereArgs: [ciudadSeleccionada],
+    );
+
+    print('🔍 SERIES ENCONTRADAS EN SQLITE: ${result.length}');
+    for (var row in result) {
+      print('🧪 serieId: ${row['serieId']} | ciudadId: ${row['ciudadId']}');
+    }
+
+    setState(() {
+      series =
+          result
+              .map((e) => QueryDocumentSnapshotFake(e['serieId'] as String, e))
+              .toList();
+    });
   }
 
   Future<void> cargarBloques() async {
-    if (ciudadSeleccionada == null || serieSeleccionada == null) return;
+    if (serieSeleccionada == null) return;
 
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
-    final box = Hive.box('offline_bloques');
+    final hayConexion = await _hasConexion();
+    final table = 'bloques';
 
     if (hayConexion) {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada)
-              .collection('series')
-              .doc(serieSeleccionada)
-              .collection('bloques')
-              .get();
-
-      final bloquesList = snapshot.docs.map((doc) => doc.id).toList();
-      setState(() => bloques = bloquesList);
-
-      await box.put('bloques_$serieSeleccionada', bloquesList);
-    } else {
-      final local = box.get('bloques_$serieSeleccionada') ?? [];
-      setState(() => bloques = List<String>.from(local));
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'series/$serieSeleccionada/bloques',
+        tableName: table,
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'bloqueId': doc.id,
+              'serieId': serieSeleccionada,
+              'nombre': doc['nombre'] ?? '',
+              'isSynced': 1,
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+      );
     }
+
+    final result = await GlobalServices.syncService.db.query(
+      table,
+      where: 'serieId = ?',
+      whereArgs: [serieSeleccionada],
+    );
+
+    setState(() {
+      bloques = result.map((e) => e['bloqueId'].toString()).toList();
+    });
   }
+
+  ////cargar Parcelas
 
   Future<void> cargarParcelas() async {
     if (bloqueSeleccionado == null) return;
 
-    final connectivity = await Connectivity().checkConnectivity();
-    final hayConexion = connectivity != ConnectivityResult.none;
-    final box = Hive.box('offline_parcelas');
-    final key =
-        'parcelas_${ciudadSeleccionada}_${serieSeleccionada}_$bloqueSeleccionado';
+    final hayConexion = await _hasConexion();
+    final table = 'parcelas';
 
     if (hayConexion) {
-      final snapshot =
-          await FirebaseFirestore.instance
-              .collection('ciudades')
-              .doc(ciudadSeleccionada!)
-              .collection('series')
-              .doc(serieSeleccionada!)
-              .collection('bloques')
-              .doc(bloqueSeleccionado!)
-              .collection('parcelas')
-              .orderBy('numero')
-              .get();
+      await GlobalServices.syncService.fetchAndCacheCollection(
+        firestorePath: 'bloques/$bloqueSeleccionado/parcelas',
+        tableName: table,
+        docIdFn: (doc) => doc.id,
+        mapFn:
+            (doc) => {
+              'parcelaId': doc.id,
+              'bloqueId': bloqueSeleccionado,
+              'numero': doc['numero'] ?? 0,
+              'numero_tratamiento': doc['numero_tratamiento'] ?? 0,
+              'numero_ficha': doc['numero_ficha'] ?? '',
+              'tratamiento': (doc['tratamiento'] ?? false) ? 1 : 0,
+              'trabajador_id': doc['trabajador_id'] ?? '',
+              'total_raices': doc['total_raices'] ?? 0,
+              'isSynced': 1,
+              'timestamp': DateTime.now().toIso8601String(),
+            },
+      );
+    }
 
-      final docs = snapshot.docs;
+    final result = await GlobalServices.syncService.db.query(
+      table,
+      where: 'bloqueId = ?',
+      whereArgs: [bloqueSeleccionado],
+      orderBy: 'numero ASC',
+    );
 
-      bool faltanCampos = docs.any((doc) {
-        final data = doc.data();
-        return data == null || !data.containsKey('numero_tratamiento');
-      });
-
-      if (faltanCampos) {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text("⚠️ Campo faltante"),
-                content: const Text(
-                  "Este bloque contiene parcelas sin 'número de tratamiento'.",
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Aceptar"),
-                  ),
-                ],
-              ),
-        );
-        return;
-      }
-
-      setState(() => parcelas = docs);
-
-      final list =
-          docs
+    setState(() {
+      parcelas =
+          result
               .map(
-                (doc) => {
-                  'id': doc.id,
-                  'numero': doc['numero'],
-                  'numero_tratamiento': doc['numero_tratamiento'],
-                  'numero_ficha': doc['numero_ficha'],
-                },
+                (e) => QueryDocumentSnapshotFake(e['parcelaId'] as String, e),
               )
               .toList();
-
-      await box.put(key, list);
-    } else {
-      final local = box.get(key) ?? [];
-
-      if (local.isEmpty) {
-        showDialog(
-          context: context,
-          builder:
-              (context) => AlertDialog(
-                title: const Text("Sin datos offline"),
-                content: const Text(
-                  "No hay datos guardados para este bloque en modo offline. Por favor, conéctate al menos una vez.",
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text("Aceptar"),
-                  ),
-                ],
-              ),
-        );
-        return;
-      }
-
-      // ✅ Este paso hace que el dropdown funcione en modo offline
-      setState(() => parcelas = List<Map<String, dynamic>>.from(local));
-    }
+    });
   }
 
   Future<void> actualizarInfoParcela(String id) async {
@@ -525,8 +758,10 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
             icon: const Icon(Icons.logout, color: Colors.black),
             tooltip: "Cerrar sesión",
             onPressed: () async {
-              final userBox = Hive.box('offline_user');
-              await userBox.delete('usuario_actual');
+              await GlobalServices.syncService.db.delete('usuarios_locales');
+
+              // 🔐 también cerrar sesión de Firebase si está online
+              await FirebaseAuth.instance.signOut();
 
               if (context.mounted) {
                 Navigator.pushAndRemoveUntil(
@@ -572,7 +807,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     ),
                                   );
                                 }).toList(),
-                                (value) {
+                                (value) async {
                                   setState(() {
                                     ciudadSeleccionada = value;
                                     serieSeleccionada = null;
@@ -582,7 +817,12 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     bloques.clear();
                                     parcelas.clear();
                                   });
-                                  cargarSeries();
+
+                                  await cargarSeries(); // Carga asincrónica dependiente de ciudadSeleccionada
+
+                                  setState(
+                                    () {},
+                                  ); // Fuerza reconstrucción luego de que `series` se cargue
                                 },
                               ),
                             ),
@@ -606,7 +846,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     ),
                                   );
                                 }).toList(),
-                                (value) {
+                                (value) async {
                                   setState(() {
                                     serieSeleccionada = value;
                                     bloqueSeleccionado = null;
@@ -614,8 +854,13 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     bloques.clear();
                                     parcelas.clear();
                                   });
-                                  cargarBloques();
-                                  cargarSuperficieDesdeSerie();
+
+                                  await cargarBloques(); // Depende de serieSeleccionada
+                                  await cargarSuperficieDesdeSerie();
+
+                                  setState(
+                                    () {},
+                                  ); // Reconstruye con bloques ya cargados
                                 },
                               ),
                             ),
@@ -646,13 +891,18 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                     ),
                                   );
                                 }).toList(),
-                                (value) {
+                                (value) async {
                                   setState(() {
                                     bloqueSeleccionado = value;
                                     parcelaSeleccionada = null;
                                     parcelas.clear();
                                   });
-                                  cargarParcelas();
+
+                                  await cargarParcelas(); // Depende de bloqueSeleccionado
+
+                                  setState(
+                                    () {},
+                                  ); // Refresca las parcelas luego de la carga
                                 },
                               ),
                             ),
@@ -680,8 +930,11 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
                                   setState(() {
                                     parcelaSeleccionada = value;
                                   });
+
                                   if (value != null) {
-                                    actualizarInfoParcela(value);
+                                    actualizarInfoParcela(
+                                      value,
+                                    ); // Esta puede ser async si lo deseas
                                   }
                                 },
                               ),
@@ -856,7 +1109,7 @@ class _InicioTratamientoScreenState extends State<InicioTratamientoScreen> {
 }
 
 QueryDocumentSnapshotFake _mapToQuerySnapshot(Map<String, dynamic> map) {
-  return QueryDocumentSnapshotFake(map['id'], {'nombre': map['nombre']});
+  return QueryDocumentSnapshotFake(map['id']?.toString() ?? '', map);
 }
 
 class QueryDocumentSnapshotFake {
@@ -866,15 +1119,18 @@ class QueryDocumentSnapshotFake {
   QueryDocumentSnapshotFake(this.id, this._data);
 
   Map<String, dynamic> data() => _data;
+
   dynamic operator [](String key) => _data[key];
 }
 
 String obtenerCampo(dynamic doc, String campo) {
   try {
+    if (doc is Map<String, dynamic>) return doc[campo]?.toString() ?? '';
+    if (doc is QueryDocumentSnapshotFake) {
+      return doc.data()[campo]?.toString() ?? '';
+    }
     if (doc is QueryDocumentSnapshot || doc is DocumentSnapshot) {
-      return doc[campo]?.toString() ?? '';
-    } else if (doc is Map<String, dynamic>) {
-      return doc[campo]?.toString() ?? '';
+      return (doc.data() as Map<String, dynamic>)[campo]?.toString() ?? '';
     }
   } catch (_) {}
   return '';
@@ -882,10 +1138,17 @@ String obtenerCampo(dynamic doc, String campo) {
 
 String obtenerId(dynamic doc) {
   try {
+    if (doc is Map<String, dynamic>) {
+      // Buscar clave terminada en Id
+      return doc['serieId']?.toString() ??
+          doc['bloqueId']?.toString() ??
+          doc['parcelaId']?.toString() ??
+          doc['ciudadId']?.toString() ??
+          '';
+    }
+    if (doc is QueryDocumentSnapshotFake) return doc.id;
     if (doc is QueryDocumentSnapshot || doc is DocumentSnapshot) {
       return doc.id;
-    } else if (doc is Map<String, dynamic>) {
-      return doc['id'] ?? '';
     }
   } catch (_) {}
   return '';

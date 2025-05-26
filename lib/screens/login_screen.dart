@@ -1,9 +1,11 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:controlgestionagro/screens/worker/inicio_tratamiento.dart';
+import 'package:controlgestionagro/services/global_services.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 
 import 'register_screen.dart';
 import 'setup_screen.dart';
@@ -11,10 +13,9 @@ import 'admin/admin_dashboard.dart';
 import 'worker/worker_dashboard.dart';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'package:hive/hive.dart';
+
 import 'package:controlgestionagro/models/users_local.dart';
 
-import 'package:hive/hive.dart';
 import '../models/users_local.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -38,10 +39,9 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   void _verificarUsuarioOperadorPersistido() async {
-    final userBox = Hive.box('offline_user');
-    final usuario = userBox.get('usuario_actual');
+    final usuario = await getUsuarioLocal();
 
-    if (usuario != null && usuario['rol'] == 'operador') {
+    if (usuario != null && usuario.rol == 'operador') {
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(builder: (_) => const InicioTratamientoScreen()),
@@ -49,24 +49,33 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<UsuarioLocal?> obtenerUsuarioActual() async {
-    final connectivity = await Connectivity().checkConnectivity();
-    final box = Hive.box('offline_user');
+  Future<UsuarioLocal?> getUsuarioLocal() async {
+    final db = GlobalServices.syncService.db;
 
-    if (connectivity == ConnectivityResult.none) {
-      // 🔌 Sin conexión: usar datos de Hive
-      final usuario = box.get('usuario_actual');
-      if (usuario != null) return UsuarioLocal.fromMap(usuario);
-    } else {
-      // 🌐 Online: usar usuario activo de Firebase
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        final usuario = box.get('usuario_actual');
-        if (usuario != null) return UsuarioLocal.fromMap(usuario);
+    try {
+      final result = await db.query('usuarios_locales', limit: 1);
+      if (result.isNotEmpty) {
+        return UsuarioLocal.fromMap(result.first);
       }
+    } catch (e) {
+      print('❌ Error obteniendo usuario local: $e');
     }
 
-    return null; // No hay usuario válido
+    return null;
+  }
+
+  Future<UsuarioLocal?> obtenerUsuarioActual() async {
+    final connectivity = await Connectivity().checkConnectivity();
+    final db = GlobalServices.syncService.db;
+
+    try {
+      final result = await db.query('usuarios_locales', limit: 1);
+      if (result.isEmpty) return null;
+      return UsuarioLocal.fromMap(result.first);
+    } catch (e) {
+      print('❌ Error obteniendo usuario actual: $e');
+      return null;
+    }
   }
 
   Future<void> _cargarUsuariosRecientes() async {
@@ -111,17 +120,23 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const SetupScreen()),
         );
       } else {
-        // 🟡 GUARDAR EN HIVE
-        final usuarioBox = Hive.box('offline_user');
+        // ✅ Aquí se define `usuarioLocal` antes de usarlo
         final usuarioLocal = UsuarioLocal(
           uid: uid,
           email: emailController.text.trim(),
           rol: userData['rol'] ?? '',
           nombre: userData['nombre'] ?? '',
           ciudad: userData['ciudad'] ?? '',
-          password: passwordController.text.trim(), // ✅ agregado
+          password: passwordController.text.trim(),
         );
-        await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
+
+        // ✅ Guardamos en SQLite
+        await GlobalServices.syncService.db.insert(
+          'usuarios_locales',
+          usuarioLocal.toMap()
+            ..['timestamp'] = DateTime.now().toIso8601String(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
 
         final rol = userData['rol'];
         if (rol == "admin") {
@@ -166,6 +181,8 @@ class _LoginScreenState extends State<LoginScreen> {
               .doc(uid)
               .get();
 
+      final db = GlobalServices.syncService.db;
+
       if (!userDoc.exists) {
         await FirebaseFirestore.instance.collection('usuarios').doc(uid).set({
           'email': email,
@@ -181,17 +198,21 @@ class _LoginScreenState extends State<LoginScreen> {
       } else {
         final data = userDoc.data() as Map<String, dynamic>;
 
-        // 🟡 GUARDAR EN HIVE
-        final usuarioBox = Hive.box('offline_user');
         final usuarioLocal = UsuarioLocal(
           uid: uid,
           email: email,
           rol: data['rol'] ?? '',
           nombre: data['nombre'] ?? '',
           ciudad: data['ciudad'] ?? '',
-          password: '', // ✅ agregado, valor vacío
+          password: '',
         );
-        await usuarioBox.put('usuario_actual', usuarioLocal.toMap());
+
+        await db.insert(
+          'usuarios_locales',
+          usuarioLocal.toMap()
+            ..['timestamp'] = DateTime.now().toIso8601String(),
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
 
         if (data['rol'] == null || data['nombre'] == null) {
           Navigator.pushReplacement(
@@ -206,7 +227,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           Navigator.pushReplacement(
             context,
-            MaterialPageRoute(builder: (_) => const WorkerDashboard()),
+            MaterialPageRoute(builder: (_) => const InicioTratamientoScreen()),
           );
         }
       }
@@ -331,58 +352,90 @@ class _LoginScreenState extends State<LoginScreen> {
 
               ElevatedButton.icon(
                 onPressed: () async {
-                  final box = Hive.box('offline_user');
-                  final usuario = box.get('usuario_actual');
+                  final db = GlobalServices.syncService.db;
 
-                  // ✅ Si Hive tiene un usuario operador, usarlo y salir
-                  if (usuario != null && usuario['rol'] == 'operador') {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const InicioTratamientoScreen(),
-                      ),
-                    );
-                    return;
-                  }
-
-                  // 🔍 Si no está en Hive, pero sí hay un usuario anónimo activo, usarlo y guardarlo en Hive
-                  final currentUser = FirebaseAuth.instance.currentUser;
-                  if (currentUser != null && currentUser.isAnonymous) {
-                    final usuarioLocal = UsuarioLocal(
-                      uid: currentUser.uid,
-                      email: 'anonimo@operador.com',
-                      rol: 'operador',
-                      nombre: 'Usuario Operador',
-                      ciudad: '',
-                      password: '',
-                    );
-                    await box.put('usuario_actual', usuarioLocal.toMap());
-
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(
-                        builder: (_) => const InicioTratamientoScreen(),
-                      ),
-                    );
-                    return;
-                  }
-
-                  // ⚠️ Solo si no hay Hive ni usuario anónimo activo, creamos uno nuevo
                   try {
-                    final cred =
-                        await FirebaseAuth.instance.signInAnonymously();
-                    final user = cred.user!;
+                    final conectado = await Connectivity().checkConnectivity();
+                    final hayConexion = conectado != ConnectivityResult.none;
 
+                    // 🔹 ¿Existe usuario operador local?
+                    final result = await db.query(
+                      'usuarios_locales',
+                      where: 'rol = ?',
+                      whereArgs: ['operador'],
+                      limit: 1,
+                    );
+
+                    if (result.isNotEmpty) {
+                      print("✅ Operador local encontrado");
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InicioTratamientoScreen(),
+                        ),
+                      );
+                      return;
+                    }
+
+                    if (!hayConexion) {
+                      print("⚠️ Sin conexión, pero crearé operador localmente");
+
+                      final usuarioLocal = UsuarioLocal(
+                        uid: 'operador_local',
+                        email: 'local@operador.com',
+                        rol: 'operador',
+                        nombre: 'Usuario Operador',
+                        ciudad: '',
+                        password: '',
+                      );
+
+                      await db.insert(
+                        'usuarios_locales',
+                        usuarioLocal.toMap()
+                          ..['timestamp'] = DateTime.now().toIso8601String(),
+                        conflictAlgorithm: ConflictAlgorithm.replace,
+                      );
+
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const InicioTratamientoScreen(),
+                        ),
+                      );
+                      return;
+                    }
+
+                    // 🔹 Crear operador local si no existe (usando solo SQLite)
                     final usuarioLocal = UsuarioLocal(
-                      uid: user.uid,
-                      email: 'anonimo@operador.com',
+                      uid: 'operador_local',
+                      email: 'local@operador.com',
                       rol: 'operador',
                       nombre: 'Usuario Operador',
                       ciudad: '',
                       password: '',
                     );
-                    await box.put('usuario_actual', usuarioLocal.toMap());
 
+                    // ✅ INSERTAR EN SQLITE
+                    await db.insert(
+                      'usuarios_locales',
+                      usuarioLocal.toMap()
+                        ..['timestamp'] = DateTime.now().toIso8601String(),
+                      conflictAlgorithm: ConflictAlgorithm.replace,
+                    );
+
+                    // ✅ PASO 2: GUARDAR EN FIRESTORE TAMBIÉN
+                    await FirebaseFirestore.instance
+                        .collection('usuarios')
+                        .doc('operador_local')
+                        .set({
+                          'email': 'local@operador.com',
+                          'rol': 'operador',
+                          'nombre': 'Usuario Operador',
+                          'ciudad': '',
+                          'timestamp': DateTime.now().toIso8601String(),
+                        });
+
+                    print("✅ Usuario operador creado en SQLite y Firestore");
                     Navigator.pushReplacement(
                       context,
                       MaterialPageRoute(
@@ -390,13 +443,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     );
                   } catch (e) {
-                    print('❌ Error al crear usuario anónimo: $e');
+                    print('❌ Error al crear usuario operador: $e');
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Error al iniciar sesión')),
                     );
                   }
                 },
-
                 icon: const Icon(Icons.play_arrow),
                 label: const Text("Operador", style: TextStyle(fontSize: 40)),
                 style: ElevatedButton.styleFrom(
